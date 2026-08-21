@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Palm tree avatar">
+  <circle cx="32" cy="32" r="32" fill="#2D5D7B" />
+  <path
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="3"
+    stroke-linecap="round"
+    d="M33 50 C33 40 27 36 29 26"
+  />
+  <g fill="#FFFFFF">
+    <path d="M29 26 C22 21 16 22 12 27 C19 27 24 28 29 26 Z" />
+    <path d="M29 26 C24 17 18 15 12 16 C17 21 22 25 29 26 Z" />
+    <path d="M29 26 C29 16 25 11 20 8 C27 11 31 16 29 26 Z" />
+    <path d="M29 26 C34 16 40 13 46 15 C40 19 34 23 29 26 Z" />
+    <path d="M29 26 C36 24 42 26 46 31 C39 30 33 29 29 26 Z" />
+  </g>
+</svg>

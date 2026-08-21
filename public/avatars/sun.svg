@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sun avatar">
+  <circle cx="32" cy="32" r="32" fill="#E8A96B" />
+  <g stroke="#FFFFFF" stroke-width="3" stroke-linecap="round">
+    <line x1="32" y1="8" x2="32" y2="15" />
+    <line x1="32" y1="49" x2="32" y2="56" />
+    <line x1="8" y1="32" x2="15" y2="32" />
+    <line x1="49" y1="32" x2="56" y2="32" />
+    <line x1="15.5" y1="15.5" x2="20.5" y2="20.5" />
+    <line x1="43.5" y1="43.5" x2="48.5" y2="48.5" />
+    <line x1="48.5" y1="15.5" x2="43.5" y2="20.5" />
+    <line x1="20.5" y1="43.5" x2="15.5" y2="48.5" />
+  </g>
+  <circle cx="32" cy="32" r="12" fill="#FFFFFF" />
+</svg>

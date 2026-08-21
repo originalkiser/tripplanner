@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+@theme {
+  --font-heading: 'Chakra Petch', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+
+  /* light mode (default) */
+  --color-bg: #faf3e7;
+  --color-surface: #ffffff;
+  --color-primary: #1b7a8c;
+  --color-secondary: #2d5d7b;
+  --color-accent: #e8a96b;
+  --color-text: #1f2a2e;
+}
+
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --color-bg: #0f2027;
+    --color-surface: #16323d;
+    --color-primary: #4fc3d9;
+    --color-secondary: #7fb3d5;
+    --color-accent: #e8a96b;
+    --color-text: #eaf2f3;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #0f2027;
+  --color-surface: #16323d;
+  --color-primary: #4fc3d9;
+  --color-secondary: #7fb3d5;
+  --color-accent: #e8a96b;
+  --color-text: #eaf2f3;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100svh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
+}
+
+.font-data {
+  font-family: var(--font-mono);
+}
