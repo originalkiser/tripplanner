@@ -11,7 +11,7 @@ void useAuthStore.getState().init()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter basename="/tripplanner">
+    <BrowserRouter basename={import.meta.env.PROD ? '/tripplanner' : undefined}>
       <App />
     </BrowserRouter>
   </StrictMode>,
