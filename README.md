@@ -16,6 +16,19 @@ Then open `http://localhost:5173`. The Supabase project is already live and
 seeded (see PROJECT_BRIEF.md), so a real `.env.local` gets you a fully
 working login.
 
+## Deployment
+
+Hosted on GitHub Pages via [.github/workflows/deploy.yml](.github/workflows/deploy.yml) —
+every push to `main` builds and deploys automatically to
+`https://originalkiser.github.io/tripplanner/`. The Supabase URL and anon key
+are baked in at build time in the workflow itself (the anon key is meant to
+be public; RLS is what actually protects the data, not keeping that key
+secret). `vite.config.ts` sets `base: '/tripplanner/'` and the router uses a
+matching `basename` since this is a project page, not a `<user>.github.io`
+root site; a `dist/index.html` → `dist/404.html` copy step gives client-side
+routes a working refresh/deep-link fallback, since GitHub Pages has no
+server-side rewrite support of its own.
+
 ## Status
 
 All 9 phases from [PROJECT_BRIEF.md](PROJECT_BRIEF.md) are built and running
