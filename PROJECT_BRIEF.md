@@ -25,6 +25,38 @@ Requires login; the roster is a closed list of pre-seeded/invited emails
 Supabase project: **Trip Planner**, under the existing `github.com/originalkiser`
 org (same Pro subscription).
 
+## Post-launch redesign (nautical theme, navigation, photo tagging)
+
+After the initial 9 phases shipped and the group started really using it, a
+follow-up pass reworked several things:
+
+- **Fixed broken avatars in production** — `<img src="/avatars/x.svg">` doesn't
+  respect Vite's `base` path once deployed to a subpath; [lib/assetUrl.ts](src/lib/assetUrl.ts)
+  resolves stored `avatar_url` values against `import.meta.env.BASE_URL` everywhere
+  they're rendered.
+- **Custom avatar photo upload** — alongside the 8 presets, `/profile` now lets
+  anyone upload their own photo (compressed client-side, stored in `trip-photos`
+  under `avatars/<user_id>/`, `avatar_type = 'custom'`).
+- **Bottom nav grew to 6 tabs** with icons: List, Unplanned, Map, Album, Digest,
+  Profile. List now shows **only** day-assigned activities; everything without a
+  day (unscheduled or `imported_note`) moved to its own **Unplanned** tab
+  ([UnplannedPage.tsx](src/features/activities/UnplannedPage.tsx)).
+- **Trip Album redesign** — no longer tucked under Profile; it's a bottom-nav tab
+  showing *every* photo from the trip in one chronological feed (by upload time —
+  true EXIF "date taken" extraction was skipped as scope not worth it here),
+  with per-photo activity/location tagging (re-assignable after upload) and
+  people-tagging (`trip.photo_tags`, migration 0007).
+- **Type editing** — the creator or an admin can reclassify an activity between
+  Food / Activity / Food & Activity after the fact, from the expanded card.
+- **Day color-coding** — each of the 4 trip days gets a halo color (teal / sand /
+  ocean blue / coral) echoed as a ring around every card from that day.
+- **Nautical theme** — palette now includes `--surface-2`, `--line`, `--text-dim`,
+  `--savannah`/`--tybee`/`--coral` tokens; [HeroScene.tsx](src/components/HeroScene.tsx)
+  renders an animated sky/water backdrop (glowing sun or moon, swaying palms,
+  birds flying past, an occasional leaping dolphin) behind the top of every page,
+  with day/night pure-CSS-swapped (`.scene-day`/`.scene-night`) to always match
+  the active light/dark theme.
+
 ## Data model (schema: `trip`)
 
 - `trip.trips` — id, name, start_date, end_date, is_active (lets a second trip

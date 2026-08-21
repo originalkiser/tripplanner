@@ -4,13 +4,19 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { usePhotosStore } from '../../stores/photosStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
+import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PhotoGallery } from '../photos/PhotoGallery'
+import type { ActivityType } from '../../types/database'
 
 const TYPE_LABEL: Record<string, string> = {
   food: 'Food',
   activity: 'Activity',
   food_and_activity: 'Food & Activity',
 }
+
+const TYPE_OPTIONS: ActivityType[] = ['food', 'activity', 'food_and_activity']
+
+const FALLBACK_AVATAR = resolveAssetUrl('/avatars/starfish.svg')!
 
 // Stable reference so the Zustand selector below doesn't return a fresh
 // array on every call (that trips useSyncExternalStore into an infinite
@@ -32,15 +38,16 @@ function formatTime(time: string | null): string {
   return `${hour12}:${m} ${ampm}`
 }
 
-export function ActivityCard({ activity }: { activity: Activity }) {
+export function ActivityCard({ activity, haloColor }: { activity: Activity; haloColor?: string | null }) {
   const profile = useAuthStore((s) => s.profile)
-  const { joinActivity, proposeAltTime, rateActivity, leaveActivity } = useActivitiesStore()
+  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, updateType } = useActivitiesStore()
 
   const [expanded, setExpanded] = useState(false)
   const [proposing, setProposing] = useState(false)
   const [proposeDate, setProposeDate] = useState('')
   const [proposeTime, setProposeTime] = useState('')
   const [busy, setBusy] = useState(false)
+  const [editingType, setEditingType] = useState(false)
 
   const photos = usePhotosStore((s) => s.byActivity[activity.id] ?? EMPTY_PHOTOS)
   const fetchPhotosForActivity = usePhotosStore((s) => s.fetchForActivity)
@@ -53,6 +60,7 @@ export function ActivityCard({ activity }: { activity: Activity }) {
   const mine = profile ? activity.participants.find((p) => p.user_id === profile.id) : undefined
   const joined = activity.participants.filter((p) => p.status === 'joined')
   const proposedAlts = activity.participants.filter((p) => p.status === 'proposed_alt_time')
+  const canEdit = profile && (profile.id === activity.created_by || profile.is_admin)
 
   async function handleJoin() {
     if (!profile) return
@@ -84,8 +92,21 @@ export function ActivityCard({ activity }: { activity: Activity }) {
     setBusy(false)
   }
 
+  async function handleTypeChange(type: ActivityType) {
+    setBusy(true)
+    await updateType(activity.id, type)
+    setBusy(false)
+    setEditingType(false)
+  }
+
   return (
-    <div className="rounded-xl bg-surface p-3 shadow-sm">
+    <div
+      className="card-shadow rounded-xl border bg-surface p-3"
+      style={{
+        borderColor: haloColor ?? 'var(--color-line)',
+        boxShadow: haloColor ? `0 0 0 1px ${haloColor}22, var(--shadow-card)` : undefined,
+      }}
+    >
       <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-left">
         <div className="flex items-start justify-between gap-2">
           <div>
@@ -100,7 +121,7 @@ export function ActivityCard({ activity }: { activity: Activity }) {
               )}
             </div>
             <h3 className="mt-1 font-heading text-lg font-semibold">{activity.name}</h3>
-            <p className="font-data text-xs opacity-60">
+            <p className="font-data text-xs text-text-dim">
               {activity.proposed_time ? formatTime(activity.proposed_time) : 'No time set'}
               {rating != null && ` · ${rating.toFixed(1)}★`}
             </p>
@@ -108,11 +129,15 @@ export function ActivityCard({ activity }: { activity: Activity }) {
           {activity.creator && (
             <div className="flex flex-col items-center gap-1 text-center">
               {activity.creator.avatar_url ? (
-                <img src={activity.creator.avatar_url} alt="" className="h-8 w-8 rounded-full" />
+                <img
+                  src={resolveAssetUrl(activity.creator.avatar_url) ?? undefined}
+                  alt=""
+                  className="h-8 w-8 rounded-full object-cover"
+                />
               ) : (
                 <div className="h-8 w-8 rounded-full bg-secondary/20" />
               )}
-              <span className="text-[10px] opacity-60">{activity.creator.display_name}</span>
+              <span className="text-[10px] text-text-dim">{activity.creator.display_name}</span>
             </div>
           )}
         </div>
@@ -122,10 +147,10 @@ export function ActivityCard({ activity }: { activity: Activity }) {
             {joined.map((p) => (
               <img
                 key={p.user_id}
-                src={p.profile?.avatar_url ?? '/avatars/starfish.svg'}
+                src={resolveAssetUrl(p.profile?.avatar_url) ?? FALLBACK_AVATAR}
                 alt={p.profile?.display_name ?? ''}
                 title={p.profile?.display_name ?? ''}
-                className="h-6 w-6 rounded-full border-2 border-surface"
+                className="h-6 w-6 rounded-full border-2 border-surface object-cover"
               />
             ))}
           </div>
@@ -146,12 +171,12 @@ export function ActivityCard({ activity }: { activity: Activity }) {
       </button>
 
       {expanded && (
-        <div className="mt-3 flex flex-col gap-3 border-t border-secondary/10 pt-3">
+        <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           {activity.description && <p className="text-sm">{activity.description}</p>}
 
           {activity.location_name && (
             <div className="text-sm">
-              <p className="opacity-70">{activity.location_name}</p>
+              <p className="text-text-dim">{activity.location_name}</p>
               {activity.location_lat && activity.location_lng && (
                 <div className="mt-1 flex gap-3 text-xs">
                   <a
@@ -171,16 +196,46 @@ export function ActivityCard({ activity }: { activity: Activity }) {
             </div>
           )}
 
+          {canEdit && (
+            <div>
+              {!editingType ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingType(true)}
+                  className="text-xs text-primary underline"
+                >
+                  Change type
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  {TYPE_OPTIONS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleTypeChange(t)}
+                      className={`rounded-lg px-2 py-1 text-xs font-medium disabled:opacity-50 ${
+                        activity.type === t ? 'bg-primary text-white' : 'bg-bg'
+                      }`}
+                    >
+                      {TYPE_LABEL[t]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
-            <p className="mb-1 text-xs font-medium opacity-70">Who's in</p>
+            <p className="mb-1 text-xs font-medium text-text-dim">Who's in</p>
             {joined.length === 0 && <p className="text-xs opacity-50">Nobody yet</p>}
             <ul className="flex flex-col gap-1">
               {joined.map((p) => (
                 <li key={p.user_id} className="flex items-center gap-2 text-sm">
                   <img
-                    src={p.profile?.avatar_url ?? '/avatars/starfish.svg'}
+                    src={resolveAssetUrl(p.profile?.avatar_url) ?? FALLBACK_AVATAR}
                     alt=""
-                    className="h-5 w-5 rounded-full"
+                    className="h-5 w-5 rounded-full object-cover"
                   />
                   {p.profile?.display_name}
                   {p.rating != null && <span className="opacity-50">· {p.rating}★</span>}
@@ -226,14 +281,14 @@ export function ActivityCard({ activity }: { activity: Activity }) {
                 required
                 value={proposeDate}
                 onChange={(e) => setProposeDate(e.target.value)}
-                className="flex-1 rounded-lg border border-secondary/30 bg-bg px-2 py-1 text-sm"
+                className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-sm"
               />
               <input
                 type="time"
                 required
                 value={proposeTime}
                 onChange={(e) => setProposeTime(e.target.value)}
-                className="flex-1 rounded-lg border border-secondary/30 bg-bg px-2 py-1 text-sm"
+                className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-sm"
               />
               <button
                 type="submit"
@@ -247,7 +302,7 @@ export function ActivityCard({ activity }: { activity: Activity }) {
 
           {mine && (
             <div>
-              <p className="mb-1 text-xs font-medium opacity-70">Your rating</p>
+              <p className="mb-1 text-xs font-medium text-text-dim">Your rating</p>
               <div className="flex gap-1">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
@@ -266,7 +321,7 @@ export function ActivityCard({ activity }: { activity: Activity }) {
           )}
 
           <div>
-            <p className="mb-1 text-xs font-medium opacity-70">Photos</p>
+            <p className="mb-1 text-xs font-medium text-text-dim">Photos</p>
             <PhotoGallery activityId={activity.id} photos={photos} />
           </div>
         </div>

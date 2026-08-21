@@ -163,6 +163,22 @@ export interface Database {
         Update: Partial<Database['trip']['Tables']['activity_photos']['Insert']>
         Relationships: []
       }
+      photo_tags: {
+        Row: {
+          photo_id: string
+          user_id: string
+          tagged_by: string
+          created_at: string
+        }
+        Insert: {
+          photo_id: string
+          user_id: string
+          tagged_by: string
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['photo_tags']['Insert']>
+        Relationships: []
+      }
       activity_changes: {
         Row: {
           id: string

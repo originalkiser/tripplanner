@@ -24,14 +24,19 @@ export function DigestBanner() {
   )
 
   return (
-    <div className="mb-4 rounded-xl bg-primary/10 p-3">
+    <div
+      className="card-shadow mb-4 rounded-xl p-3 text-white"
+      style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))' }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-primary">While you were away</p>
-        <button type="button" onClick={() => setDismissed(true)} className="text-xs opacity-60">
+        <p className="flex items-center gap-1.5 text-sm font-medium">
+          <span aria-hidden>👋</span> While you were away
+        </p>
+        <button type="button" onClick={() => setDismissed(true)} className="text-xs opacity-80">
           Dismiss
         </button>
       </div>
-      <ul className="mt-1 flex flex-col gap-0.5 text-sm">
+      <ul className="mt-1 flex flex-col gap-0.5 text-sm opacity-95">
         {(Object.entries(counts) as [ChangeType, number][]).map(([type, count]) => (
           <li key={type}>
             {count} {CHANGE_GROUP_LABEL[type].toLowerCase()}

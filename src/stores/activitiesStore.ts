@@ -80,6 +80,7 @@ interface ActivitiesState {
     rating: number,
   ) => Promise<{ error: string | null }>
   leaveActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
+  updateType: (activityId: string, type: ActivityType) => Promise<{ error: string | null }>
 }
 
 export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
@@ -181,6 +182,13 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       .delete()
       .eq('activity_id', activityId)
       .eq('user_id', userId)
+    if (error) return { error: error.message }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  updateType: async (activityId, type) => {
+    const { error } = await supabase.from('activities').update({ type }).eq('id', activityId)
     if (error) return { error: error.message }
     await get().fetchActivities()
     return { error: null }

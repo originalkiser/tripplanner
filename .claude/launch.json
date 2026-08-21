@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "tripplanner-dev-alt",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5183"],
+      "port": 5183
+    },
+    {
       "name": "tripplanner-preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview", "--", "--port", "4173"],

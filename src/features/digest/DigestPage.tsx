@@ -36,7 +36,7 @@ export function DigestPage() {
         <button
           type="button"
           onClick={() => setDate((d) => shiftDay(d, -1))}
-          className="rounded-lg bg-surface px-3 py-1.5 text-sm shadow-sm"
+          className="card-shadow rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
         >
           &larr; Prev
         </button>
@@ -44,26 +44,26 @@ export function DigestPage() {
         <button
           type="button"
           onClick={() => setDate((d) => shiftDay(d, 1))}
-          className="rounded-lg bg-surface px-3 py-1.5 text-sm shadow-sm"
+          className="card-shadow rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
         >
           Next &rarr;
         </button>
       </div>
 
-      {loadingDay && <p className="mt-4 text-sm opacity-60">Loading…</p>}
+      {loadingDay && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
 
       {!loadingDay && dayEntries.length === 0 && (
-        <p className="mt-8 text-center text-sm opacity-60">Nothing happened this day.</p>
+        <p className="mt-8 text-center text-sm text-text-dim">Nothing happened this day.</p>
       )}
 
       <ul className="mt-4 flex flex-col gap-2">
         {dayEntries.map((e) => (
-          <li key={e.id} className="rounded-xl bg-surface p-3 text-sm shadow-sm">
+          <li key={e.id} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
             <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
             {CHANGE_VERB[e.change_type]}{' '}
             <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
-            {e.summary_text && <p className="mt-1 text-xs opacity-60">{e.summary_text}</p>}
-            <p className="font-data mt-1 text-[11px] opacity-50">
+            {e.summary_text && <p className="mt-1 text-xs text-text-dim">{e.summary_text}</p>}
+            <p className="font-data mt-1 text-[11px] text-text-dim">
               {new Date(e.created_at).toLocaleTimeString(undefined, {
                 hour: 'numeric',
                 minute: '2-digit',

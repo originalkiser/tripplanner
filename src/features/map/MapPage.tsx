@@ -6,17 +6,11 @@ import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { fetchRoute, formatDistance, formatDuration, setIntegrationKey } from '../../lib/routing'
-
-const DAYS = [
-  { date: '2026-09-04', label: 'Fri Sept 4' },
-  { date: '2026-09-05', label: 'Sat Sept 5' },
-  { date: '2026-09-06', label: 'Sun Sept 6' },
-  { date: '2026-09-07', label: 'Mon Sept 7' },
-]
+import { TRIP_DAYS } from '../../lib/days'
 
 const CATEGORY_COLOR: Record<string, string> = {
-  savannah: '#2D5D7B',
-  tybee: '#1B7A8C',
+  savannah: 'var(--color-savannah)',
+  tybee: 'var(--color-tybee)',
 }
 
 const TYPE_ICON: Record<string, string> = {
@@ -50,7 +44,7 @@ export function MapPage() {
   const markersRef = useRef<Marker[]>([])
 
   const [routingMode, setRoutingMode] = useState<'off' | 'day' | 'pair'>('off')
-  const [selectedDay, setSelectedDay] = useState(DAYS[0].date)
+  const [selectedDay, setSelectedDay] = useState(TRIP_DAYS[0].date)
   const [pairSelection, setPairSelection] = useState<Activity[]>([])
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
   const [routeNeedsSetup, setRouteNeedsSetup] = useState(false)
@@ -273,11 +267,11 @@ export function MapPage() {
             <select
               value={selectedDay}
               onChange={(e) => setSelectedDay(e.target.value)}
-              className="flex-1 rounded-lg border border-secondary/30 bg-bg px-2 py-1 text-sm"
+              className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-sm"
             >
-              {DAYS.map((d) => (
+              {TRIP_DAYS.map((d) => (
                 <option key={d.date} value={d.date}>
-                  {d.label}
+                  {d.shortLabel}
                 </option>
               ))}
             </select>
@@ -334,7 +328,7 @@ export function MapPage() {
                 placeholder="ORS API key"
                 value={orsKeyInput}
                 onChange={(e) => setOrsKeyInput(e.target.value)}
-                className="flex-1 rounded-lg border border-secondary/30 bg-bg px-2 py-1"
+                className="flex-1 rounded-lg border border-line bg-bg px-2 py-1"
               />
               <button
                 type="submit"

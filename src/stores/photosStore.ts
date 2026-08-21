@@ -2,6 +2,11 @@ import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/imageCompression'
 
+export interface PhotoTag {
+  user_id: string
+  profile: { display_name: string } | null
+}
+
 export interface Photo {
   id: string
   activity_id: string | null
@@ -10,23 +15,36 @@ export interface Photo {
   caption: string | null
   created_at: string
   uploader: { display_name: string } | null
+  activity: { id: string; name: string } | null
+  tags: PhotoTag[]
 }
 
-const SELECT = `id, activity_id, user_id, storage_path, caption, created_at, uploader:user_profiles!user_id(display_name)`
+const SELECT = `
+  id, activity_id, user_id, storage_path, caption, created_at,
+  uploader:user_profiles!user_id(display_name),
+  activity:activities(id, name),
+  tags:photo_tags(user_id, profile:user_profiles!user_id(display_name))
+`
 
 interface PhotosState {
   byActivity: Record<string, Photo[]>
   album: Photo[]
+  all: Photo[]
   loading: boolean
   fetchForActivity: (activityId: string) => Promise<void>
   fetchAlbum: () => Promise<void>
+  fetchAll: () => Promise<void>
   upload: (file: File, userId: string, activityId: string | null) => Promise<{ error: string | null }>
   remove: (photo: Photo) => Promise<{ error: string | null }>
+  linkToActivity: (photoId: string, activityId: string | null) => Promise<{ error: string | null }>
+  addTag: (photoId: string, userId: string, taggedBy: string) => Promise<{ error: string | null }>
+  removeTag: (photoId: string, userId: string) => Promise<{ error: string | null }>
 }
 
 export const usePhotosStore = create<PhotosState>((set, get) => ({
   byActivity: {},
   album: [],
+  all: [],
   loading: false,
 
   fetchForActivity: async (activityId) => {
@@ -59,6 +77,20 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
     set({ album: (data ?? []) as unknown as Photo[], loading: false })
   },
 
+  fetchAll: async () => {
+    set({ loading: true })
+    const { data, error } = await supabase
+      .from('activity_photos')
+      .select(SELECT)
+      .order('created_at', { ascending: true })
+    if (error) {
+      console.error(error)
+      set({ loading: false })
+      return
+    }
+    set({ all: (data ?? []) as unknown as Photo[], loading: false })
+  },
+
   upload: async (file, userId, activityId) => {
     const compressed = await compressImage(file)
     const ext = 'jpg'
@@ -79,6 +111,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
     if (activityId) await get().fetchForActivity(activityId)
     else await get().fetchAlbum()
+    await get().fetchAll()
 
     return { error: null }
   },
@@ -90,7 +123,38 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
     if (photo.activity_id) await get().fetchForActivity(photo.activity_id)
     else await get().fetchAlbum()
+    await get().fetchAll()
 
+    return { error: null }
+  },
+
+  linkToActivity: async (photoId, activityId) => {
+    const { error } = await supabase
+      .from('activity_photos')
+      .update({ activity_id: activityId })
+      .eq('id', photoId)
+    if (error) return { error: error.message }
+    await get().fetchAll()
+    return { error: null }
+  },
+
+  addTag: async (photoId, userId, taggedBy) => {
+    const { error } = await supabase
+      .from('photo_tags')
+      .insert({ photo_id: photoId, user_id: userId, tagged_by: taggedBy })
+    if (error) return { error: error.message }
+    await get().fetchAll()
+    return { error: null }
+  },
+
+  removeTag: async (photoId, userId) => {
+    const { error } = await supabase
+      .from('photo_tags')
+      .delete()
+      .eq('photo_id', photoId)
+      .eq('user_id', userId)
+    if (error) return { error: error.message }
+    await get().fetchAll()
     return { error: null }
   },
 }))

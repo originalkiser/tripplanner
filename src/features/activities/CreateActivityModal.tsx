@@ -129,7 +129,7 @@ export function CreateActivityModal({ onClose }: { onClose: () => void }) {
             placeholder="Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
 
           <div className="flex items-center gap-2">
@@ -167,13 +167,13 @@ export function CreateActivityModal({ onClose }: { onClose: () => void }) {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="flex-1 rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+                className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
               />
               <input
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="flex-1 rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+                className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
               />
             </div>
           )}
@@ -183,10 +183,10 @@ export function CreateActivityModal({ onClose }: { onClose: () => void }) {
               placeholder="Search for a location"
               value={locationQuery}
               onChange={(e) => onLocationInput(e.target.value)}
-              className="w-full rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+              className="w-full rounded-lg border border-line bg-bg px-3 py-2"
             />
             {locationResults.length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-secondary/30 bg-surface shadow-lg">
+              <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
                 {locationResults.map((r) => (
                   <li key={r.placeId}>
                     <button
@@ -229,7 +229,7 @@ export function CreateActivityModal({ onClose }: { onClose: () => void }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
 
           <div>

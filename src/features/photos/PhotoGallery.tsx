@@ -43,7 +43,7 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
             <img src={tripPhotoUrl(p.storage_path)} alt="" className="h-full w-full object-cover" />
           </button>
         ))}
-        <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-secondary/30 text-2xl text-secondary/50">
+        <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-line text-2xl text-secondary/50">
           {uploading ? '…' : '+'}
           <input
             ref={fileRef}

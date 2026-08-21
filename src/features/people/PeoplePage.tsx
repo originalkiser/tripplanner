@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { resolveAssetUrl } from '../../lib/assetUrl'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -79,7 +80,7 @@ export function PeoplePage() {
       </Link>
       <h1 className="mb-4 mt-2 text-2xl font-semibold text-primary">Trip Members</h1>
 
-      <section className="mb-6 rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow mb-6 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Add someone</h2>
         <form onSubmit={invite} className="flex flex-col gap-3">
           <input
@@ -88,13 +89,13 @@ export function PeoplePage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
           <input
             placeholder="Name (optional)"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
           <button
             type="submit"
@@ -107,14 +108,18 @@ export function PeoplePage() {
         {inviteStatus && <p className="mt-3 text-sm">{inviteStatus}</p>}
       </section>
 
-      <section className="rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Everyone on the trip</h2>
         {loadingMembers && <p className="text-sm opacity-70">Loading…</p>}
         <ul className="flex flex-col gap-3">
           {members.map((member) => (
             <li key={member.id} className="flex items-center gap-3">
               {member.avatar_url ? (
-                <img src={member.avatar_url} alt="" className="h-10 w-10 rounded-full" />
+                <img
+                  src={resolveAssetUrl(member.avatar_url) ?? undefined}
+                  alt=""
+                  className="h-10 w-10 rounded-full object-cover"
+                />
               ) : (
                 <div className="h-10 w-10 rounded-full bg-secondary/20" />
               )}
@@ -134,7 +139,7 @@ export function PeoplePage() {
                   type="button"
                   onClick={() => void resetPassword(member)}
                   disabled={resettingId === member.id}
-                  className="rounded-lg border border-secondary/30 px-3 py-1.5 text-xs disabled:opacity-50"
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs disabled:opacity-50"
                 >
                   {resettingId === member.id ? 'Resetting…' : 'Reset password'}
                 </button>

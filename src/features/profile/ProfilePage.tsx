@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { PRESET_AVATARS } from './presetAvatars'
 import { getStoredTheme, setTheme, type ThemePreference } from '../../lib/theme'
+import { resolveAssetUrl } from '../../lib/assetUrl'
+import { compressImage } from '../../lib/imageCompression'
 
 export function ProfilePage() {
   const profile = useAuthStore((s) => s.profile)
@@ -17,6 +19,9 @@ export function ProfilePage() {
   const [savingName, setSavingName] = useState(false)
 
   const [savingAvatar, setSavingAvatar] = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -24,7 +29,7 @@ export function ProfilePage() {
   const [savingPassword, setSavingPassword] = useState(false)
 
   if (!profile) {
-    return <div className="p-4 text-sm opacity-70">Setting up your profile…</div>
+    return <div className="p-4 text-sm text-text-dim">Setting up your profile…</div>
   }
 
   async function saveName(e: React.FormEvent) {
@@ -49,6 +54,39 @@ export function ProfilePage() {
     setSavingAvatar(null)
     if (error) alert(`Error: ${error.message}`)
     else await refreshProfile()
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingPhoto(true)
+    setUploadError(null)
+
+    const compressed = await compressImage(file)
+    const path = `avatars/${profile!.id}/${crypto.randomUUID()}.jpg`
+    const { error: uploadErr } = await supabase.storage
+      .from('trip-photos')
+      .upload(path, compressed, { contentType: 'image/jpeg' })
+
+    if (uploadErr) {
+      setUploadingPhoto(false)
+      setUploadError(uploadErr.message)
+      return
+    }
+
+    const { data: pub } = supabase.storage.from('trip-photos').getPublicUrl(path)
+    const { error: updateErr } = await supabase
+      .from('user_profiles')
+      .update({ avatar_url: pub.publicUrl, avatar_type: 'custom' })
+      .eq('id', profile!.id)
+
+    setUploadingPhoto(false)
+    if (updateErr) {
+      setUploadError(updateErr.message)
+      return
+    }
+    await refreshProfile()
+    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -81,7 +119,7 @@ export function ProfilePage() {
     <div className="mx-auto max-w-md p-4 pb-8">
       <h1 className="text-2xl font-semibold text-primary">Profile</h1>
 
-      <section className="mt-4 rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Appearance</h2>
         <div className="flex gap-2">
           {(['system', 'light', 'dark'] as ThemePreference[]).map((pref) => (
@@ -102,8 +140,17 @@ export function ProfilePage() {
         </div>
       </section>
 
-      <section className="mt-4 rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Avatar</h2>
+
+        {profile.avatar_type === 'custom' && profile.avatar_url && (
+          <img
+            src={resolveAssetUrl(profile.avatar_url) ?? undefined}
+            alt="Your photo"
+            className="mb-3 h-16 w-16 rounded-full object-cover ring-2 ring-primary"
+          />
+        )}
+
         <div className="grid grid-cols-4 gap-3">
           {PRESET_AVATARS.map((avatar) => (
             <button
@@ -113,25 +160,42 @@ export function ProfilePage() {
               disabled={savingAvatar === avatar.path}
               aria-label={avatar.label}
               className={`rounded-full ring-2 transition disabled:opacity-50 ${
-                profile.avatar_url === avatar.path
+                profile.avatar_type === 'preset' && profile.avatar_url === avatar.path
                   ? 'ring-primary'
                   : 'ring-transparent hover:ring-secondary/40'
               }`}
             >
-              <img src={avatar.path} alt={avatar.label} className="h-14 w-14" />
+              <img
+                src={resolveAssetUrl(avatar.path) ?? undefined}
+                alt={avatar.label}
+                className="h-14 w-14"
+              />
             </button>
           ))}
         </div>
+
+        <label className="card-shadow mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line py-2.5 text-sm font-medium text-primary">
+          {uploadingPhoto ? 'Uploading…' : 'Upload your own photo'}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            onChange={(e) => void handlePhotoUpload(e)}
+            className="hidden"
+            disabled={uploadingPhoto}
+          />
+        </label>
+        {uploadError && <p className="mt-1 text-xs text-red-600">{uploadError}</p>}
       </section>
 
-      <section className="mt-4 rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Name</h2>
         <form onSubmit={saveName} className="flex flex-col gap-3">
           <input
             required
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
           <button
             type="submit"
@@ -144,7 +208,7 @@ export function ProfilePage() {
         </form>
       </section>
 
-      <section className="mt-4 rounded-xl bg-surface p-4 shadow-sm">
+      <section className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Password</h2>
         <form onSubmit={changePassword} className="flex flex-col gap-3">
           <input
@@ -152,14 +216,14 @@ export function ProfilePage() {
             placeholder="New password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
           <input
             type="password"
             placeholder="Confirm new password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="rounded-lg border border-secondary/30 bg-bg px-3 py-2"
+            className="rounded-lg border border-line bg-bg px-3 py-2"
           />
           <button
             type="submit"
@@ -174,16 +238,9 @@ export function ProfilePage() {
 
       <Link
         to="/people"
-        className="mt-4 block rounded-xl bg-surface p-4 text-sm font-medium text-primary shadow-sm"
+        className="card-shadow mt-4 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
       >
         Trip members &rarr;
-      </Link>
-
-      <Link
-        to="/album"
-        className="mt-3 block rounded-xl bg-surface p-4 text-sm font-medium text-primary shadow-sm"
-      >
-        Trip Album &rarr;
       </Link>
 
       <button

@@ -4,6 +4,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { PeoplePage } from './features/people/PeoplePage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { ActivityListPage } from './features/activities/ActivityListPage'
+import { UnplannedPage } from './features/activities/UnplannedPage'
 import { DigestPage } from './features/digest/DigestPage'
 import { TripAlbumPage } from './features/photos/TripAlbumPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -24,6 +25,7 @@ function App() {
             <AppShell>
               <Routes>
                 <Route path="/" element={<ActivityListPage />} />
+                <Route path="/unplanned" element={<UnplannedPage />} />
                 <Route
                   path="/map"
                   element={
