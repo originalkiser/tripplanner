@@ -82,11 +82,11 @@ h4 {
   box-shadow: var(--shadow-card);
 }
 
-/* Beach scene backdrop: swaying palm trees + a glowing sun or moon, no
-   horizon line. Fixed to the top of the viewport (see .scene-fixed) so it
-   never scrolls away. */
+/* Beach scene backdrop: sky, horizon, water, swaying palm trees, drifting
+   clouds, a twinkling night sky, and a glowing sun or moon. Fixed to the top
+   of the viewport (see .scene-fixed) so it never scrolls away. */
 :root {
-  --scene-h: 84px;
+  --scene-h: 120px;
 }
 
 .scene-fixed {
@@ -128,6 +128,58 @@ h4 {
   }
 }
 
+.scene-star {
+  animation-name: scene-twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes scene-twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.scene-cloud {
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.scene-cloud-a {
+  animation-name: scene-float-a;
+  animation-duration: 14s;
+}
+
+.scene-cloud-b {
+  animation-name: scene-float-b;
+  animation-duration: 18s;
+  animation-delay: -4s;
+}
+
+@keyframes scene-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(6px, -2px);
+  }
+}
+
+@keyframes scene-float-b {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-5px, 2px);
+  }
+}
+
 .scene-day {
   display: block;
 }
@@ -157,7 +209,9 @@ h4 {
 
 @media (prefers-reduced-motion: reduce) {
   .scene-sun,
-  .scene-palm .scene-fronds {
+  .scene-palm .scene-fronds,
+  .scene-star,
+  .scene-cloud {
     animation: none !important;
   }
 }
