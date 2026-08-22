@@ -4,7 +4,7 @@
 export type ActivityType = 'food' | 'activity' | 'food_and_activity'
 export type ActivityCategory = 'savannah' | 'tybee'
 export type ActivitySource = 'user_added' | 'imported_note'
-export type ParticipantStatus = 'joined' | 'proposed_alt_time'
+export type ParticipantStatus = 'joined' | 'proposed_alt_time' | 'invited'
 export type ChangeType =
   | 'created'
   | 'updated'

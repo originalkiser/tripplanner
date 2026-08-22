@@ -56,6 +56,23 @@ export interface ActivityFields {
   category: ActivityCategory
 }
 
+export interface PendingInvite {
+  activity: Activity
+  participant: ActivityParticipant
+}
+
+// Activities this user has been requested to join but hasn't responded to
+// yet — the same shape of "pending" used for the Home notifications section
+// and the Home/nav badge counts.
+export function pendingInvites(activities: Activity[], userId: string): PendingInvite[] {
+  const result: PendingInvite[] = []
+  for (const activity of activities) {
+    const participant = activity.participants.find((p) => p.user_id === userId && p.status === 'invited')
+    if (participant) result.push({ activity, participant })
+  }
+  return result
+}
+
 const SELECT = `
   *,
   creator:user_profiles!created_by(display_name, avatar_url),
@@ -86,6 +103,8 @@ interface ActivitiesState {
     rating: number,
   ) => Promise<{ error: string | null }>
   leaveActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
+  inviteParticipants: (activityId: string, userIds: string[]) => Promise<{ error: string | null }>
+  respondToInvite: (activityId: string, userId: string, accept: boolean) => Promise<{ error: string | null }>
 }
 
 function toRow(input: ActivityFields) {
@@ -203,6 +222,40 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       .eq('activity_id', activityId)
       .eq('user_id', userId)
     if (error) return { error: error.message }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  inviteParticipants: async (activityId, userIds) => {
+    if (userIds.length === 0) return { error: null }
+    // ignoreDuplicates so this never clobbers someone who's already a
+    // participant (joined, already invited, etc.) — only brand-new rows
+    // land as a pending invite.
+    const { error } = await supabase.from('activity_participants').upsert(
+      userIds.map((userId) => ({ activity_id: activityId, user_id: userId, status: 'invited' })),
+      { onConflict: 'activity_id,user_id', ignoreDuplicates: true },
+    )
+    if (error) return { error: error.message }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  respondToInvite: async (activityId, userId, accept) => {
+    if (accept) {
+      const { error } = await supabase
+        .from('activity_participants')
+        .update({ status: 'joined' })
+        .eq('activity_id', activityId)
+        .eq('user_id', userId)
+      if (error) return { error: error.message }
+    } else {
+      const { error } = await supabase
+        .from('activity_participants')
+        .delete()
+        .eq('activity_id', activityId)
+        .eq('user_id', userId)
+      if (error) return { error: error.message }
+    }
     await get().fetchActivities()
     return { error: null }
   },

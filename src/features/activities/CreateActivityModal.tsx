@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useActivitiesStore, type Activity, type ActivityFields } from '../../stores/activitiesStore'
 import { categoryFromLatLng, searchLocations, type LocationResult } from '../../lib/geo'
@@ -6,7 +6,9 @@ import { MiniMap } from '../../components/MiniMap'
 import { fetchLinkPreview } from '../../lib/linkPreview'
 import { usePollsStore } from '../../stores/pollsStore'
 import { supabase } from '../../lib/supabase'
-import type { ActivityCategory, ActivityType } from '../../types/database'
+import type { ActivityCategory, ActivityType, Database } from '../../types/database'
+
+type Member = Database['trip']['Tables']['user_profiles']['Row']
 
 const TYPE_OPTIONS: { value: ActivityType; label: string }[] = [
   { value: 'food', label: 'Food' },
@@ -53,7 +55,31 @@ export function CreateActivityModal({
   const profile = useAuthStore((s) => s.profile)
   const createActivity = useActivitiesStore((s) => s.createActivity)
   const updateActivity = useActivitiesStore((s) => s.updateActivity)
+  const inviteParticipants = useActivitiesStore((s) => s.inviteParticipants)
   const isEdit = !!activity
+
+  const [members, setMembers] = useState<Member[]>([])
+  const [inviteIds, setInviteIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    void supabase
+      .from('user_profiles')
+      .select('*')
+      .order('display_name')
+      .then(({ data }) => setMembers(data ?? []))
+  }, [])
+
+  const alreadyParticipating = new Set(activity?.participants.map((p) => p.user_id) ?? [])
+  const inviteCandidates = members.filter((m) => m.id !== profile?.id && !alreadyParticipating.has(m.id))
+
+  function toggleInvite(userId: string) {
+    setInviteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
+  }
 
   const [type, setType] = useState<ActivityType>(activity?.type ?? 'activity')
   const [name, setName] = useState(activity?.name ?? '')
@@ -160,11 +186,15 @@ export function CreateActivityModal({
 
     if (isEdit && activity) {
       const { error } = await updateActivity(activity.id, fields)
-      setSaving(false)
       if (error) {
+        setSaving(false)
         setError(error)
         return
       }
+      if (inviteIds.size > 0) {
+        await inviteParticipants(activity.id, [...inviteIds])
+      }
+      setSaving(false)
       onClose()
       return
     }
@@ -205,6 +235,10 @@ export function CreateActivityModal({
       }
     }
 
+    if (inviteIds.size > 0) {
+      await inviteParticipants(activityId, [...inviteIds])
+    }
+
     setSaving(false)
     onClose()
   }
@@ -223,7 +257,7 @@ export function CreateActivityModal({
 
         <form
           onSubmit={submit}
-          className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         >
           <div className="flex gap-2">
             {TYPE_OPTIONS.map((opt) => (
@@ -363,6 +397,27 @@ export function CreateActivityModal({
                   </button>
                 </div>
               )}
+            </div>
+          )}
+
+          {inviteCandidates.length > 0 && (
+            <div className="rounded-lg bg-secondary/10 p-3">
+              <p className="text-sm font-medium">Request others to join</p>
+              <p className="mt-0.5 text-xs text-text-dim">
+                They'll show up as pending in their notifications until they accept or decline.
+              </p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {inviteCandidates.map((m) => (
+                  <label key={m.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={inviteIds.has(m.id)}
+                      onChange={() => toggleInvite(m.id)}
+                    />
+                    {m.display_name}
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 

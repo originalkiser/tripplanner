@@ -7,8 +7,20 @@ import { usePollsStore, pendingPolls } from '../../stores/pollsStore'
 import { usePollSnoozeStore } from '../../stores/pollSnoozeStore'
 import { usePendingPollCount } from '../polls/usePendingPollCount'
 import { PollSection } from '../polls/PollSection'
+import { useActivitiesStore, pendingInvites } from '../../stores/activitiesStore'
+import { usePendingInviteCount } from '../activities/usePendingInviteCount'
+import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
+
+function formatTime(time: string | null): string {
+  if (!time) return ''
+  const [h, m] = time.split(':')
+  const hour = parseInt(h, 10)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${hour12}:${m} ${ampm}`
+}
 
 interface Stay {
   trip_id: string
@@ -28,6 +40,13 @@ export function HomePage() {
   const { snooze } = usePollSnoozeStore()
   const pendingPollCount = usePendingPollCount()
   const myPendingPolls = profile ? pendingPolls(allPolls, profile.id) : []
+  const activities = useActivitiesStore((s) => s.activities)
+  const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
+  const respondToInvite = useActivitiesStore((s) => s.respondToInvite)
+  const pendingInviteCount = usePendingInviteCount()
+  const myPendingInvites = profile ? pendingInvites(activities, profile.id) : []
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+  const notificationCount = pendingPollCount + pendingInviteCount
   const [stay, setStay] = useState<Stay | null>(null)
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -47,6 +66,17 @@ export function HomePage() {
   useEffect(() => {
     void fetchWeather()
   }, [fetchWeather])
+
+  useEffect(() => {
+    void fetchActivities()
+  }, [fetchActivities])
+
+  async function respond(activityId: string, accept: boolean) {
+    if (!profile) return
+    setRespondingId(activityId)
+    await respondToInvite(activityId, profile.id, accept)
+    setRespondingId(null)
+  }
 
   async function load() {
     setLoading(true)
@@ -111,7 +141,7 @@ export function HomePage() {
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Link
-          to="/"
+          to="/planned"
           className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
         >
           <TodayIcon />
@@ -145,9 +175,9 @@ export function HomePage() {
           href="#notifications"
           className="card-shadow relative flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
         >
-          {pendingPollCount > 0 && (
+          {notificationCount > 0 && (
             <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-semibold text-white">
-              {pendingPollCount}
+              {notificationCount}
             </span>
           )}
           <NotificationsIcon />
@@ -186,14 +216,61 @@ export function HomePage() {
 
       <div id="notifications" className="mt-4 scroll-mt-4">
         <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
-          Notifications {pendingPollCount > 0 && `(${pendingPollCount})`}
+          Notifications {notificationCount > 0 && `(${notificationCount})`}
         </h2>
-        {myPendingPolls.length === 0 ? (
+        {myPendingPolls.length === 0 && myPendingInvites.length === 0 ? (
           <p className="card-shadow rounded-xl border border-dashed border-line bg-surface p-4 text-center text-sm text-text-dim">
-            You're all caught up — no polls waiting on you.
+            You're all caught up
           </p>
         ) : (
           <div className="flex flex-col gap-2">
+            {myPendingInvites.map(({ activity }) => (
+              <div key={activity.id} className="card-shadow rounded-xl border border-line bg-surface p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {activity.creator?.avatar_url ? (
+                      <img
+                        src={resolveAssetUrl(activity.creator.avatar_url) ?? undefined}
+                        alt=""
+                        className="h-8 w-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-secondary/20" />
+                    )}
+                    <div>
+                      <p className="text-xs font-medium text-text-dim">
+                        {activity.creator?.display_name ?? 'Someone'} requested you join
+                      </p>
+                      <h3 className="font-heading text-base font-semibold">{activity.name}</h3>
+                      {activity.proposed_date && (
+                        <p className="font-data text-xs text-text-dim">
+                          {activity.proposed_date}
+                          {activity.proposed_time && ` · ${formatTime(activity.proposed_time)}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={respondingId === activity.id}
+                    onClick={() => void respond(activity.id, true)}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    disabled={respondingId === activity.id}
+                    onClick={() => void respond(activity.id, false)}
+                    className="rounded-lg bg-bg px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
             {myPendingPolls.map((poll) => (
               <div key={poll.id} className="card-shadow rounded-xl border border-line bg-surface p-3">
                 <div className="mb-2 flex items-start justify-between gap-2">

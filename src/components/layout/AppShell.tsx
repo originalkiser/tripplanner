@@ -1,9 +1,11 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
 import { PollStack } from '../../features/polls/PollStack'
 import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
+import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
+import { useActivitiesStore } from '../../stores/activitiesStore'
 
 // Pulls in MapLibre (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -16,7 +18,7 @@ const CreateActivityModal = lazy(() =>
 const HIDE_GLOBAL_ADD = ['/album']
 
 const LEFT_TABS = [
-  { to: '/', label: 'Planned', end: true, icon: PlannedIcon },
+  { to: '/planned', label: 'Planned', end: true, icon: PlannedIcon },
   { to: '/unplanned', label: 'Unplanned', end: false, icon: UnplannedIcon },
   { to: '/map', label: 'Map', end: false, icon: MapIcon },
 ]
@@ -32,6 +34,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [showCreate, setShowCreate] = useState(false)
   const showGlobalAdd = !HIDE_GLOBAL_ADD.includes(location.pathname)
   const pendingPollCount = usePendingPollCount()
+  const pendingInviteCount = usePendingInviteCount()
+  const pendingCount = pendingPollCount + pendingInviteCount
+  const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
+
+  useEffect(() => {
+    void fetchActivities()
+  }, [fetchActivities])
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
@@ -75,7 +84,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
 
         <NavLink
-          to="/home"
+          to="/"
+          end
           className="absolute left-1/2 -top-2.5 flex -translate-x-1/2 flex-col items-center gap-0.5"
         >
           {({ isActive }) => (
@@ -86,9 +96,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 }`}
               >
                 <HomeIcon active={isActive} />
-                {pendingPollCount > 0 && (
+                {pendingCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-white">
-                    {pendingPollCount}
+                    {pendingCount}
                   </span>
                 )}
               </div>

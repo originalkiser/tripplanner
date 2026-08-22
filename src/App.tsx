@@ -25,7 +25,8 @@ function App() {
           <ProtectedRoute>
             <AppShell>
               <Routes>
-                <Route path="/" element={<ActivityListPage />} />
+                <Route path="/" element={<HomePage />} />
+                <Route path="/planned" element={<ActivityListPage />} />
                 <Route path="/unplanned" element={<UnplannedPage />} />
                 <Route
                   path="/map"
