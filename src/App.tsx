@@ -10,6 +10,7 @@ import { TripAlbumPage } from './features/photos/TripAlbumPage'
 import { HomePage } from './features/home/HomePage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
+import { SunLoader } from './components/SunLoader'
 
 // MapLibre GL is the single heaviest dependency — keep it out of the main
 // bundle so first load (List/Profile on a phone) stays fast.
@@ -31,7 +32,13 @@ function App() {
                 <Route
                   path="/map"
                   element={
-                    <Suspense fallback={<div className="p-4 text-sm opacity-60">Loading map…</div>}>
+                    <Suspense
+                      fallback={
+                        <div className="flex h-[calc(100svh-64px)] items-center justify-center">
+                          <SunLoader label="Loading map…" />
+                        </div>
+                      }
+                    >
                       <MapPage />
                     </Suspense>
                   }

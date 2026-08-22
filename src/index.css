@@ -117,6 +117,22 @@ h4 {
   }
 }
 
+/* SunLoader — a small sun-and-rays mark for full-screen loading states. */
+.sun-loader-rays {
+  transform-origin: 32px 32px;
+  animation: sun-loader-spin 3s linear infinite;
+}
+
+@keyframes sun-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sun-loader-core {
+  animation: scene-glow 2.2s ease-in-out infinite;
+}
+
 .scene-palm .scene-fronds {
   /* Plain SVG user units, not a percentage — this pivots at this group's
      own local (0,0), the trunk-top attachment point. A percentage would
@@ -220,7 +236,9 @@ h4 {
   .scene-sun,
   .scene-palm .scene-fronds,
   .scene-star,
-  .scene-cloud {
+  .scene-cloud,
+  .sun-loader-rays,
+  .sun-loader-core {
     animation: none !important;
   }
 }
