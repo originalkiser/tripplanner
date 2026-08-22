@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { useDigestStore, activityHref } from '../../stores/digestStore'
+import { useDigestStore } from '../../stores/digestStore'
 import { CHANGE_GROUP_LABEL, CHANGE_VERB } from './changeLabels'
 import type { ChangeType } from '../../types/database'
 
-export function DigestBanner() {
+export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: string) => void }) {
   const previousLastSeenAt = useAuthStore((s) => s.previousLastSeenAt)
   const { sinceLastVisit, fetchSinceLastVisit } = useDigestStore()
   const [dismissed, setDismissed] = useState(false)
@@ -56,7 +55,6 @@ export function DigestBanner() {
       ) : (
         <ul className="mt-2 flex flex-col gap-1.5 border-t border-white/20 pt-2 text-sm">
           {sinceLastVisit.map((e) => {
-            const href = activityHref(e.activity)
             const content = (
               <>
                 <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
@@ -66,10 +64,14 @@ export function DigestBanner() {
             )
             return (
               <li key={e.id}>
-                {href ? (
-                  <Link to={href} className="underline underline-offset-2">
+                {e.activity ? (
+                  <button
+                    type="button"
+                    onClick={() => onSelectActivity(e.activity!.id)}
+                    className="text-left underline underline-offset-2"
+                  >
                     {content}
-                  </Link>
+                  </button>
                 ) : (
                   content
                 )}

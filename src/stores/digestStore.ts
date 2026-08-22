@@ -17,11 +17,6 @@ const SELECT = `
   user:user_profiles(display_name)
 `
 
-export function activityHref(activity: { id: string; proposed_date: string | null } | null): string | null {
-  if (!activity) return null
-  return `${activity.proposed_date ? '/' : '/unplanned'}?activity=${activity.id}`
-}
-
 interface DigestState {
   sinceLastVisit: ChangeEntry[]
   loadingSinceLastVisit: boolean

@@ -1,7 +1,17 @@
-import type { ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { PollStack } from '../../features/polls/PollStack'
+
+// Pulls in MapLibre (for the location-confirm preview) — keep it out of the
+// initial bundle since most screens won't open the modal.
+const CreateActivityModal = lazy(() =>
+  import('../../features/activities/CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),
+)
+
+// The album page has its own dedicated "add a photo" pinned bar — a second,
+// generic "add activity" button there would just collide with it.
+const HIDE_GLOBAL_ADD = ['/album']
 
 const LEFT_TABS = [
   { to: '/', label: 'Planned', end: true, icon: PlannedIcon },
@@ -16,6 +26,10 @@ const RIGHT_TABS = [
 ]
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  const [showCreate, setShowCreate] = useState(false)
+  const showGlobalAdd = !HIDE_GLOBAL_ADD.includes(location.pathname)
+
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
       <HeroScene />
@@ -24,6 +38,25 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="relative z-10 flex-1 overflow-y-auto pt-[var(--scene-h)]">
         {children}
       </main>
+
+      {showGlobalAdd && (
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          aria-label="Add activity"
+          className="card-shadow fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white"
+        >
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      )}
+
+      {showCreate && (
+        <Suspense fallback={null}>
+          <CreateActivityModal onClose={() => setShowCreate(false)} />
+        </Suspense>
+      )}
 
       <nav
         className="relative z-20 flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"

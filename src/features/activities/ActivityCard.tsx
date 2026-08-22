@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { Activity } from '../../stores/activitiesStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -17,6 +18,12 @@ const TYPE_LABEL: Record<string, string> = {
   food: 'Food',
   activity: 'Activity',
   food_and_activity: 'Food & Activity',
+}
+
+const TYPE_PILL_STYLE: Record<string, string> = {
+  food: 'bg-coral/15 text-coral',
+  activity: 'bg-primary/15 text-primary',
+  food_and_activity: 'bg-secondary/15 text-secondary',
 }
 
 const FALLBACK_AVATAR = resolveAssetUrl('/avatars/starfish.svg')!
@@ -130,14 +137,11 @@ export function ActivityCard({
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_PILL_STYLE[activity.type]}`}
+              >
                 {TYPE_LABEL[activity.type]}
               </span>
-              {activity.source === 'imported_note' && (
-                <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">
-                  Imported from shared note
-                </span>
-              )}
             </div>
             <h3 className="mt-1 font-heading text-lg font-semibold">{activity.name}</h3>
             <p className="font-data text-xs text-text-dim">
@@ -187,7 +191,30 @@ export function ActivityCard({
             ))}
           </div>
         )}
+
+        <div className="mt-2 flex items-center justify-between">
+          {activity.source === 'imported_note' ? (
+            <span title="Imported from shared note" className="text-text-dim opacity-60">
+              <ImportedIcon />
+            </span>
+          ) : (
+            <span />
+          )}
+          <span className="text-xs text-text-dim">
+            {joined.length} attending
+          </span>
+        </div>
       </button>
+
+      {activity.location_lat != null && activity.location_lng != null && (
+        <Link
+          to={`/map?activity=${activity.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 inline-flex items-center gap-1 text-xs text-primary underline"
+        >
+          <PinIcon /> View on map
+        </Link>
+      )}
 
       {expanded && (
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
@@ -339,5 +366,24 @@ export function ActivityCard({
         </Suspense>
       )}
     </div>
+  )
+}
+
+function ImportedIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </svg>
+  )
+}
+
+function PinIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 21s7-7.2 7-12a7 7 0 0 0-14 0c0 4.8 7 12 7 12Z" />
+      <circle cx="12" cy="9" r="2.5" />
+    </svg>
   )
 }

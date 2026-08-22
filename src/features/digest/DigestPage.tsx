@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { useDigestStore, activityHref } from '../../stores/digestStore'
+import { useDigestStore } from '../../stores/digestStore'
+import { ActivityQuickView } from '../activities/ActivityQuickView'
 import { CHANGE_VERB } from './changeLabels'
 
 function todayIso(): string {
@@ -23,6 +23,7 @@ function formatDay(date: string): string {
 
 export function DigestPage() {
   const [date, setDate] = useState(todayIso())
+  const [quickViewId, setQuickViewId] = useState<string | null>(null)
   const { dayEntries, loadingDay, fetchDay } = useDigestStore()
 
   useEffect(() => {
@@ -59,17 +60,20 @@ export function DigestPage() {
 
       <ul className="mt-4 flex flex-col gap-2">
         {dayEntries.map((e) => {
-          const href = activityHref(e.activity)
           return (
             <li key={e.id} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
               <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
               {CHANGE_VERB[e.change_type]}{' '}
-              {href ? (
-                <Link to={href} className="font-medium text-primary underline">
-                  {e.activity?.name ?? 'an activity'}
-                </Link>
+              {e.activity ? (
+                <button
+                  type="button"
+                  onClick={() => setQuickViewId(e.activity!.id)}
+                  className="font-medium text-primary underline"
+                >
+                  {e.activity.name}
+                </button>
               ) : (
-                <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
+                <span className="font-medium">an activity</span>
               )}
               {e.summary_text && <p className="mt-1 text-xs text-text-dim">{e.summary_text}</p>}
               <p className="font-data mt-1 text-[11px] text-text-dim">
@@ -82,6 +86,8 @@ export function DigestPage() {
           )
         })}
       </ul>
+
+      {quickViewId && <ActivityQuickView activityId={quickViewId} onClose={() => setQuickViewId(null)} />}
     </div>
   )
 }

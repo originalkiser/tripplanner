@@ -64,7 +64,6 @@ export function CreateActivityModal({
       : null,
   )
   const [category, setCategory] = useState<ActivityCategory>(activity?.category ?? 'savannah')
-  const [categoryTouched, setCategoryTouched] = useState(false)
 
   const [unscheduled, setUnscheduled] = useState(activity ? !activity.proposed_date : false)
 
@@ -88,9 +87,7 @@ export function CreateActivityModal({
     setSelectedLocation(loc)
     setLocationQuery(loc.displayName)
     setLocationResults([])
-    if (!categoryTouched) {
-      setCategory(categoryFromLatLng(loc.lat, loc.lng))
-    }
+    setCategory(categoryFromLatLng(loc.lat, loc.lng))
   }
 
   async function handleFetchLink() {
@@ -362,24 +359,6 @@ export function CreateActivityModal({
           </div>
 
           {selectedLocation && <MiniMap lat={selectedLocation.lat} lng={selectedLocation.lng} />}
-
-          <div className="flex gap-2">
-            {(['savannah', 'tybee'] as ActivityCategory[]).map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  setCategory(c)
-                  setCategoryTouched(true)
-                }}
-                className={`flex-1 rounded-full px-3 py-2 text-sm font-medium capitalize ${
-                  category === c ? 'bg-secondary text-white' : 'bg-bg text-text'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
 
           <textarea
             placeholder="Description (optional)"
