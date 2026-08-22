@@ -43,8 +43,12 @@ export function MapPage() {
   const mapRef = useRef<MaplibreMap | null>(null)
   const markersRef = useRef<Marker[]>([])
 
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const todayInRange = TRIP_DAYS.some((d) => d.date === todayIso)
+
   const [routingMode, setRoutingMode] = useState<'off' | 'day' | 'pair'>('off')
-  const [selectedDay, setSelectedDay] = useState(TRIP_DAYS[0].date)
+  const [selectedDay, setSelectedDay] = useState(todayInRange ? todayIso : TRIP_DAYS[0].date)
+  const [showDatePicker, setShowDatePicker] = useState(!todayInRange)
   const [pairSelection, setPairSelection] = useState<Activity[]>([])
   const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number } | null>(null)
   const [routeNeedsSetup, setRouteNeedsSetup] = useState(false)
@@ -142,9 +146,10 @@ export function MapPage() {
     }
   }, [pairSelection, routingMode])
 
-  async function runRouteForDay() {
+  async function runRouteForDay(dateOverride?: string) {
+    const targetDate = dateOverride ?? selectedDay
     const dayActivities = located
-      .filter((a) => a.proposed_date === selectedDay)
+      .filter((a) => a.proposed_date === targetDate)
       .sort((a, b) => (a.proposed_time ?? '').localeCompare(b.proposed_time ?? ''))
     if (dayActivities.length < 2) {
       setRouteError('Need at least 2 located stops that day to draw a route.')
@@ -263,25 +268,55 @@ export function MapPage() {
         </div>
 
         {routingMode === 'day' && (
-          <div className="flex gap-2 rounded-xl bg-surface p-2 shadow-md">
-            <select
-              value={selectedDay}
-              onChange={(e) => setSelectedDay(e.target.value)}
-              className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-sm"
-            >
-              {TRIP_DAYS.map((d) => (
-                <option key={d.date} value={d.date}>
-                  {d.shortLabel}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => void runRouteForDay()}
-              className="rounded-lg bg-primary px-3 py-1 text-sm font-medium text-white"
-            >
-              Draw
-            </button>
+          <div className="flex flex-col gap-2 rounded-xl bg-surface p-2 shadow-md">
+            <div className="flex gap-2">
+              {todayInRange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDay(todayIso)
+                    setShowDatePicker(false)
+                    void runRouteForDay(todayIso)
+                  }}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${
+                    !showDatePicker ? 'bg-primary text-white' : 'bg-bg'
+                  }`}
+                >
+                  Show today
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowDatePicker(true)}
+                className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${
+                  showDatePicker ? 'bg-primary text-white' : 'bg-bg'
+                }`}
+              >
+                Pick date
+              </button>
+            </div>
+            {showDatePicker && (
+              <div className="flex gap-2">
+                <select
+                  value={selectedDay}
+                  onChange={(e) => setSelectedDay(e.target.value)}
+                  className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-sm"
+                >
+                  {TRIP_DAYS.map((d) => (
+                    <option key={d.date} value={d.date}>
+                      {d.shortLabel}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void runRouteForDay()}
+                  className="rounded-lg bg-primary px-3 py-1 text-sm font-medium text-white"
+                >
+                  Draw
+                </button>
+              </div>
+            )}
           </div>
         )}
 

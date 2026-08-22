@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { useDigestStore } from '../../stores/digestStore'
-import { CHANGE_GROUP_LABEL } from './changeLabels'
+import { useDigestStore, activityHref } from '../../stores/digestStore'
+import { CHANGE_GROUP_LABEL, CHANGE_VERB } from './changeLabels'
 import type { ChangeType } from '../../types/database'
 
 export function DigestBanner() {
   const previousLastSeenAt = useAuthStore((s) => s.previousLastSeenAt)
   const { sinceLastVisit, fetchSinceLastVisit } = useDigestStore()
   const [dismissed, setDismissed] = useState(false)
+  const [showDetails, setShowDetails] = useState(false)
 
   useEffect(() => {
     if (previousLastSeenAt) void fetchSinceLastVisit(previousLastSeenAt)
@@ -29,20 +31,53 @@ export function DigestBanner() {
       style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-secondary))' }}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-sm font-medium">
+        <button
+          type="button"
+          onClick={() => setShowDetails((v) => !v)}
+          className="flex items-center gap-1.5 text-sm font-medium"
+        >
           <span aria-hidden>👋</span> While you were away
-        </p>
+        </button>
         <button type="button" onClick={() => setDismissed(true)} className="text-xs opacity-80">
           Dismiss
         </button>
       </div>
-      <ul className="mt-1 flex flex-col gap-0.5 text-sm opacity-95">
-        {(Object.entries(counts) as [ChangeType, number][]).map(([type, count]) => (
-          <li key={type}>
-            {count} {CHANGE_GROUP_LABEL[type].toLowerCase()}
-          </li>
-        ))}
-      </ul>
+
+      {!showDetails ? (
+        <button type="button" onClick={() => setShowDetails(true)} className="mt-1 block text-left">
+          <ul className="flex flex-col gap-0.5 text-sm opacity-95">
+            {(Object.entries(counts) as [ChangeType, number][]).map(([type, count]) => (
+              <li key={type}>
+                {count} {CHANGE_GROUP_LABEL[type].toLowerCase()}
+              </li>
+            ))}
+          </ul>
+        </button>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-1.5 border-t border-white/20 pt-2 text-sm">
+          {sinceLastVisit.map((e) => {
+            const href = activityHref(e.activity)
+            const content = (
+              <>
+                <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
+                {CHANGE_VERB[e.change_type]}{' '}
+                <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
+              </>
+            )
+            return (
+              <li key={e.id}>
+                {href ? (
+                  <Link to={href} className="underline underline-offset-2">
+                    {content}
+                  </Link>
+                ) : (
+                  content
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

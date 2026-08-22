@@ -26,6 +26,7 @@ export function TripAlbumPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [uploading, setUploading] = useState(false)
   const [taggingPhotoId, setTaggingPhotoId] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<Photo | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -50,29 +51,33 @@ export function TripAlbumPage() {
   async function handleDelete(photo: Photo) {
     if (!confirm('Delete this photo for everyone?')) return
     await remove(photo)
+    setLightbox(null)
   }
 
   return (
-    <div className="mx-auto max-w-md p-4 pb-24">
+    <div className="mx-auto max-w-md p-4 pb-32">
       <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
       <p className="mt-1 text-sm text-text-dim">Every photo from the trip, in time order.</p>
 
-      <label className="card-shadow mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-4 text-sm font-medium text-primary">
-        {uploading ? 'Uploading…' : '+ Add a photo'}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={(e) => void handleUpload(e)}
-          className="hidden"
-          disabled={uploading}
-        />
-      </label>
+      {all.length > 0 && (
+        <div className="mt-4 -mx-4 flex gap-0 overflow-x-auto px-6 py-3">
+          {all.map((photo, i) => (
+            <button
+              key={photo.id}
+              type="button"
+              onClick={() => setLightbox(photo)}
+              className="card-shadow relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-surface bg-surface"
+              style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i, transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 4}deg)` }}
+            >
+              <img src={tripPhotoUrl(photo.storage_path)} alt="" className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
       {!loading && all.length === 0 && (
-        <p className="mt-8 text-center text-sm text-text-dim">No photos yet — add the first one.</p>
+        <p className="mt-8 text-center text-sm text-text-dim">No photos yet — add the first one below.</p>
       )}
 
       <div className="mt-4 flex flex-col gap-4">
@@ -80,7 +85,9 @@ export function TripAlbumPage() {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-              <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
+              <button type="button" onClick={() => setLightbox(photo)} className="block w-full">
+                <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
+              </button>
               <div className="flex flex-col gap-2 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{photo.uploader?.display_name ?? 'Someone'}</span>
@@ -162,6 +169,54 @@ export function TripAlbumPage() {
           )
         })}
       </div>
+
+      <div className="fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-md px-4">
+        <label className="card-shadow flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface py-3 text-sm font-medium text-primary">
+          {uploading ? 'Uploading…' : '+ Add a photo'}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={(e) => void handleUpload(e)}
+            className="hidden"
+            disabled={uploading}
+          />
+        </label>
+      </div>
+
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+          >
+            &times;
+          </button>
+          <img
+            src={tripPhotoUrl(lightbox.storage_path)}
+            alt=""
+            className="max-h-[75vh] max-w-full rounded-lg object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div
+            className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>{lightbox.uploader?.display_name}</span>
+            {profile && (profile.id === lightbox.user_id || profile.is_admin) && (
+              <button type="button" onClick={() => void handleDelete(lightbox)} className="underline">
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useDigestStore } from '../../stores/digestStore'
+import { Link } from 'react-router-dom'
+import { useDigestStore, activityHref } from '../../stores/digestStore'
 import { CHANGE_VERB } from './changeLabels'
 
 function todayIso(): string {
@@ -57,20 +58,29 @@ export function DigestPage() {
       )}
 
       <ul className="mt-4 flex flex-col gap-2">
-        {dayEntries.map((e) => (
-          <li key={e.id} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
-            <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
-            {CHANGE_VERB[e.change_type]}{' '}
-            <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
-            {e.summary_text && <p className="mt-1 text-xs text-text-dim">{e.summary_text}</p>}
-            <p className="font-data mt-1 text-[11px] text-text-dim">
-              {new Date(e.created_at).toLocaleTimeString(undefined, {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
-            </p>
-          </li>
-        ))}
+        {dayEntries.map((e) => {
+          const href = activityHref(e.activity)
+          return (
+            <li key={e.id} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
+              <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
+              {CHANGE_VERB[e.change_type]}{' '}
+              {href ? (
+                <Link to={href} className="font-medium text-primary underline">
+                  {e.activity?.name ?? 'an activity'}
+                </Link>
+              ) : (
+                <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
+              )}
+              {e.summary_text && <p className="mt-1 text-xs text-text-dim">{e.summary_text}</p>}
+              <p className="font-data mt-1 text-[11px] text-text-dim">
+                {new Date(e.created_at).toLocaleTimeString(undefined, {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </p>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

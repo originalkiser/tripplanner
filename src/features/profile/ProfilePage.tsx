@@ -159,7 +159,7 @@ export function ProfilePage() {
               onClick={() => void pickAvatar(avatar.path)}
               disabled={savingAvatar === avatar.path}
               aria-label={avatar.label}
-              className={`rounded-full ring-2 transition disabled:opacity-50 ${
+              className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ring-2 transition disabled:opacity-50 ${
                 profile.avatar_type === 'preset' && profile.avatar_url === avatar.path
                   ? 'ring-primary'
                   : 'ring-transparent hover:ring-secondary/40'
@@ -168,7 +168,7 @@ export function ProfilePage() {
               <img
                 src={resolveAssetUrl(avatar.path) ?? undefined}
                 alt={avatar.label}
-                className="h-14 w-14"
+                className="h-14 w-14 rounded-full"
               />
             </button>
           ))}

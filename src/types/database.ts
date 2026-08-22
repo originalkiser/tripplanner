@@ -90,6 +90,7 @@ export interface Database {
           location_lat: number | null
           location_lng: number | null
           location_place_id: string | null
+          link_url: string | null
           rating_avg: number | null
           category: ActivityCategory
           source: ActivitySource
@@ -110,6 +111,7 @@ export interface Database {
           location_lat?: number | null
           location_lng?: number | null
           location_place_id?: string | null
+          link_url?: string | null
           rating_avg?: number | null
           category: ActivityCategory
           source?: ActivitySource
@@ -211,6 +213,84 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['trip']['Tables']['digests_daily']['Insert']>
+        Relationships: []
+      }
+      stays: {
+        Row: {
+          trip_id: string
+          name: string | null
+          address: string | null
+          notes: string | null
+          link_url: string | null
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          trip_id: string
+          name?: string | null
+          address?: string | null
+          notes?: string | null
+          link_url?: string | null
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['stays']['Insert']>
+        Relationships: []
+      }
+      activity_polls: {
+        Row: {
+          id: string
+          activity_id: string
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          activity_id: string
+          created_by: string
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['activity_polls']['Insert']>
+        Relationships: []
+      }
+      poll_options: {
+        Row: {
+          id: string
+          poll_id: string
+          proposed_date: string | null
+          proposed_time: string | null
+          is_other: boolean
+          proposed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          poll_id: string
+          proposed_date?: string | null
+          proposed_time?: string | null
+          is_other?: boolean
+          proposed_by?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['poll_options']['Insert']>
+        Relationships: []
+      }
+      poll_votes: {
+        Row: {
+          poll_id: string
+          user_id: string
+          option_id: string | null
+          not_interested: boolean
+          created_at: string
+        }
+        Insert: {
+          poll_id: string
+          user_id: string
+          option_id?: string | null
+          not_interested?: boolean
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['poll_votes']['Insert']>
         Relationships: []
       }
     }

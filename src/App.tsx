@@ -7,6 +7,7 @@ import { ActivityListPage } from './features/activities/ActivityListPage'
 import { UnplannedPage } from './features/activities/UnplannedPage'
 import { DigestPage } from './features/digest/DigestPage'
 import { TripAlbumPage } from './features/photos/TripAlbumPage'
+import { HomePage } from './features/home/HomePage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
 
@@ -38,6 +39,7 @@ function App() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/people" element={<PeoplePage />} />
                 <Route path="/album" element={<TripAlbumPage />} />
+                <Route path="/home" element={<HomePage />} />
               </Routes>
             </AppShell>
           </ProtectedRoute>

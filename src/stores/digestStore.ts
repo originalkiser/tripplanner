@@ -7,15 +7,20 @@ export interface ChangeEntry {
   change_type: ChangeType
   summary_text: string | null
   created_at: string
-  activity: { id: string; name: string } | null
+  activity: { id: string; name: string; proposed_date: string | null } | null
   user: { display_name: string } | null
 }
 
 const SELECT = `
   id, change_type, summary_text, created_at,
-  activity:activities(id, name),
+  activity:activities(id, name, proposed_date),
   user:user_profiles(display_name)
 `
+
+export function activityHref(activity: { id: string; proposed_date: string | null } | null): string | null {
+  if (!activity) return null
+  return `${activity.proposed_date ? '/' : '/unplanned'}?activity=${activity.id}`
+}
 
 interface DigestState {
   sinceLastVisit: ChangeEntry[]

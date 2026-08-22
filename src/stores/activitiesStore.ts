@@ -28,6 +28,7 @@ export interface Activity {
   location_lat: number | null
   location_lng: number | null
   location_place_id: string | null
+  link_url: string | null
   rating_avg: number | null
   category: ActivityCategory
   source: ActivitySource
@@ -37,6 +38,20 @@ export interface Activity {
   updated_at: string
   creator: { display_name: string; avatar_url: string | null } | null
   participants: ActivityParticipant[]
+}
+
+export interface ActivityFields {
+  type: ActivityType
+  name: string
+  description: string | null
+  proposedDate: string | null
+  proposedTime: string | null
+  locationName: string | null
+  locationLat: number | null
+  locationLng: number | null
+  locationPlaceId: string | null
+  linkUrl: string | null
+  category: ActivityCategory
 }
 
 const SELECT = `
@@ -52,21 +67,10 @@ interface ActivitiesState {
   activities: Activity[]
   loading: boolean
   fetchActivities: () => Promise<void>
-  createActivity: (input: {
-    type: ActivityType
-    name: string
-    description: string | null
-    proposedDate: string | null
-    proposedTime: string | null
-    locationName: string | null
-    locationLat: number | null
-    locationLng: number | null
-    locationPlaceId: string | null
-    category: ActivityCategory
-    source: ActivitySource
-    createdBy: string
-    initialRating: number | null
-  }) => Promise<{ error: string | null }>
+  createActivity: (
+    input: ActivityFields & { source: ActivitySource; createdBy: string; initialRating: number | null },
+  ) => Promise<{ error: string | null; activityId?: string }>
+  updateActivity: (activityId: string, input: ActivityFields) => Promise<{ error: string | null }>
   joinActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
   proposeAltTime: (
     activityId: string,
@@ -80,7 +84,22 @@ interface ActivitiesState {
     rating: number,
   ) => Promise<{ error: string | null }>
   leaveActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
-  updateType: (activityId: string, type: ActivityType) => Promise<{ error: string | null }>
+}
+
+function toRow(input: ActivityFields) {
+  return {
+    type: input.type,
+    name: input.name,
+    description: input.description,
+    proposed_date: input.proposedDate,
+    proposed_time: input.proposedTime,
+    location_name: input.locationName,
+    location_lat: input.locationLat,
+    location_lng: input.locationLng,
+    location_place_id: input.locationPlaceId,
+    link_url: input.linkUrl,
+    category: input.category,
+  }
 }
 
 export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
@@ -111,18 +130,9 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       .from('activities')
       .insert({
         trip_id: tripId,
-        type: input.type,
-        name: input.name,
-        description: input.description,
-        proposed_date: input.proposedDate,
-        proposed_time: input.proposedTime,
-        location_name: input.locationName,
-        location_lat: input.locationLat,
-        location_lng: input.locationLng,
-        location_place_id: input.locationPlaceId,
-        category: input.category,
-        source: input.source,
         created_by: input.createdBy,
+        source: input.source,
+        ...toRow(input),
       })
       .select('id')
       .single()
@@ -137,6 +147,13 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       rating: input.initialRating,
     })
 
+    await get().fetchActivities()
+    return { error: null, activityId: created.id }
+  },
+
+  updateActivity: async (activityId, input) => {
+    const { error } = await supabase.from('activities').update(toRow(input)).eq('id', activityId)
+    if (error) return { error: error.message }
     await get().fetchActivities()
     return { error: null }
   },
@@ -182,13 +199,6 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       .delete()
       .eq('activity_id', activityId)
       .eq('user_id', userId)
-    if (error) return { error: error.message }
-    await get().fetchActivities()
-    return { error: null }
-  },
-
-  updateType: async (activityId, type) => {
-    const { error } = await supabase.from('activities').update({ type }).eq('id', activityId)
     if (error) return { error: error.message }
     await get().fetchActivities()
     return { error: null }

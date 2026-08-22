@@ -25,7 +25,7 @@ Requires login; the roster is a closed list of pre-seeded/invited emails
 Supabase project: **Trip Planner**, under the existing `github.com/originalkiser`
 org (same Pro subscription).
 
-## Post-launch redesign (nautical theme, navigation, photo tagging)
+## Post-launch redesign, round 1 (nautical theme, navigation, photo tagging)
 
 After the initial 9 phases shipped and the group started really using it, a
 follow-up pass reworked several things:
@@ -56,6 +56,66 @@ follow-up pass reworked several things:
   birds flying past, an occasional leaping dolphin) behind the top of every page,
   with day/night pure-CSS-swapped (`.scene-day`/`.scene-night`) to always match
   the active light/dark theme.
+
+## Post-launch redesign, round 2 (fixes + weather, polls, home, links)
+
+A second follow-up pass, after seeing round 1 live on real devices:
+
+- **Layout fixes**: the app shell moved from `min-h-svh` to a fixed `h-svh` so
+  the bottom nav is a true flex sibling that's always on screen (previously,
+  overflowing content could push it below the fold); the nautical scene is now
+  `position: fixed` (`.scene-fixed`, `--scene-h`) so it stays put while content
+  scrolls beneath it; day-group and filter-bar headers use `sticky` positioning
+  so the current section header stays pinned as you scroll a long list.
+- **Scene redraw** — palm trees are planted at the shoreline and reach well
+  above the water line (previously the trunk overlapped the water); the bird
+  flyby is far slower and more transparent; the dolphin now genuinely arcs up
+  out of the water, rotating nose-up → level → nose-down, instead of jittering
+  in place.
+- **Avatar selection ring fixed** — grid items were stretching to fill their
+  column (default CSS Grid `stretch`), turning the circular ring into a pill;
+  the avatar buttons are now explicitly sized so the ring stays circular.
+- **Activity link field + "Fetch details"** — `link_url` column
+  (migration 0008) plus a `link-preview` Edge Function that fetches a URL
+  server-side (browsers block cross-origin HTML reads) and parses
+  OpenGraph/meta tags, prefilling the description (and name, if empty) from
+  whatever's pasted in.
+- **Full edit mode** — `CreateActivityModal` now doubles as the edit form
+  (`activity` prop); the old "change type only" control is gone in favor of a
+  single "Edit" button covering every field. The admin-only "add without a
+  day" toggle was also removed — it only ever mattered for the one-time
+  imported-note seeding, which is long done.
+- **Weather** — Open-Meteo (free, keyless; [lib/weather.ts](src/lib/weather.ts)),
+  shown once at the top of Planned if today is a trip day, otherwise as a
+  small badge next to each day's header (skipped for today's own header so it
+  isn't shown twice). Forecasts only exist ~16 days out and Open-Meteo rejects
+  the *whole* request if any date in range is beyond that — [weatherStore.ts](src/stores/weatherStore.ts)
+  clamps the requested range so a too-far-out trip's last day or two don't
+  wipe out weather for the in-range days.
+- **Digest is now actionable** — every digest entry (both the "while you were
+  away" banner, which is now click-to-expand, and the `/digest` day view)
+  links to its activity via `?activity=<id>`; `ActivityCard` auto-expands and
+  scrolls to itself when its id matches that query param, so people can join
+  or propose a time straight from the digest instead of hunting for the card.
+- **Album, made fun** — a horizontal "rolodex" strip of fanned, overlapping
+  thumbnails up top; tapping either that or a feed photo opens a full-screen
+  lightbox (close via the × or backdrop click). "+ Add a photo" is now a bar
+  fixed just above the bottom nav instead of inline content.
+- **Map routing labels** — "Route today's stops" now offers "Show today" (only
+  when today falls inside the trip) alongside "Pick date"; the routing itself
+  was already drawing real road-following polylines via OpenRouteService, this
+  just made the entry point clearer.
+- **Home tab** — a new center, raised, coral-colored nav button (`trip.stays`,
+  migration 0009) where anyone can add/edit where the group is staying
+  (name, address, notes, a link) — no owner, fully shared like everything else.
+- **Time polls** — creating an activity can include "Send poll for times"
+  (a set of date/time options); anyone can vote, mark "not interested", or
+  propose their own "other" time (which becomes a new option everyone can
+  vote on, and logs into `activity_changes` so it surfaces in the digest —
+  that's the "notification," no separate push infrastructure). Pending polls
+  also surface as a stacked-card overlay (`PollStack.tsx`) that swipes a card
+  away in a random direction once you vote. Schema: `activity_polls`,
+  `poll_options`, `poll_votes` (migration 0010).
 
 ## Data model (schema: `trip`)
 

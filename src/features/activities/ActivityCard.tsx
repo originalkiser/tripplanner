@@ -1,20 +1,23 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Activity } from '../../stores/activitiesStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { usePhotosStore } from '../../stores/photosStore'
+import { usePollsStore } from '../../stores/pollsStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PhotoGallery } from '../photos/PhotoGallery'
-import type { ActivityType } from '../../types/database'
+import { PollSection } from '../polls/PollSection'
+
+const CreateActivityModal = lazy(() =>
+  import('./CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),
+)
 
 const TYPE_LABEL: Record<string, string> = {
   food: 'Food',
   activity: 'Activity',
   food_and_activity: 'Food & Activity',
 }
-
-const TYPE_OPTIONS: ActivityType[] = ['food', 'activity', 'food_and_activity']
 
 const FALLBACK_AVATAR = resolveAssetUrl('/avatars/starfish.svg')!
 
@@ -38,23 +41,45 @@ function formatTime(time: string | null): string {
   return `${hour12}:${m} ${ampm}`
 }
 
-export function ActivityCard({ activity, haloColor }: { activity: Activity; haloColor?: string | null }) {
+export function ActivityCard({
+  activity,
+  haloColor,
+  highlightId,
+}: {
+  activity: Activity
+  haloColor?: string | null
+  highlightId?: string | null
+}) {
   const profile = useAuthStore((s) => s.profile)
-  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, updateType } = useActivitiesStore()
+  const { joinActivity, proposeAltTime, rateActivity, leaveActivity } = useActivitiesStore()
 
   const [expanded, setExpanded] = useState(false)
   const [proposing, setProposing] = useState(false)
   const [proposeDate, setProposeDate] = useState('')
   const [proposeTime, setProposeTime] = useState('')
   const [busy, setBusy] = useState(false)
-  const [editingType, setEditingType] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const photos = usePhotosStore((s) => s.byActivity[activity.id] ?? EMPTY_PHOTOS)
   const fetchPhotosForActivity = usePhotosStore((s) => s.fetchForActivity)
+  const poll = usePollsStore((s) => s.byActivity[activity.id])
+  const fetchPollForActivity = usePollsStore((s) => s.fetchForActivity)
 
   useEffect(() => {
-    if (expanded) void fetchPhotosForActivity(activity.id)
-  }, [expanded, activity.id, fetchPhotosForActivity])
+    if (expanded) {
+      void fetchPhotosForActivity(activity.id)
+      void fetchPollForActivity(activity.id)
+    }
+  }, [expanded, activity.id, fetchPhotosForActivity, fetchPollForActivity])
+
+  useEffect(() => {
+    if (highlightId && highlightId === activity.id) {
+      setExpanded(true)
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId])
 
   const rating = avgRating(activity)
   const mine = profile ? activity.participants.find((p) => p.user_id === profile.id) : undefined
@@ -92,15 +117,9 @@ export function ActivityCard({ activity, haloColor }: { activity: Activity; halo
     setBusy(false)
   }
 
-  async function handleTypeChange(type: ActivityType) {
-    setBusy(true)
-    await updateType(activity.id, type)
-    setBusy(false)
-    setEditingType(false)
-  }
-
   return (
     <div
+      ref={cardRef}
       className="card-shadow rounded-xl border bg-surface p-3"
       style={{
         borderColor: haloColor ?? 'var(--color-line)',
@@ -174,11 +193,11 @@ export function ActivityCard({ activity, haloColor }: { activity: Activity; halo
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           {activity.description && <p className="text-sm">{activity.description}</p>}
 
-          {activity.location_name && (
+          {(activity.location_name || activity.link_url) && (
             <div className="text-sm">
-              <p className="text-text-dim">{activity.location_name}</p>
-              {activity.location_lat && activity.location_lng && (
-                <div className="mt-1 flex gap-3 text-xs">
+              {activity.location_name && <p className="text-text-dim">{activity.location_name}</p>}
+              <div className="mt-1 flex flex-wrap gap-3 text-xs">
+                {activity.location_lat && activity.location_lng && (
                   <a
                     href={
                       isIOS()
@@ -191,40 +210,27 @@ export function ActivityCard({ activity, haloColor }: { activity: Activity; halo
                   >
                     Open in Maps
                   </a>
-                </div>
-              )}
+                )}
+                {activity.link_url && (
+                  <a href={activity.link_url} target="_blank" rel="noreferrer" className="text-primary underline">
+                    View link
+                  </a>
+                )}
+              </div>
             </div>
           )}
 
           {canEdit && (
-            <div>
-              {!editingType ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingType(true)}
-                  className="text-xs text-primary underline"
-                >
-                  Change type
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  {TYPE_OPTIONS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleTypeChange(t)}
-                      className={`rounded-lg px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-                        activity.type === t ? 'bg-primary text-white' : 'bg-bg'
-                      }`}
-                    >
-                      {TYPE_LABEL[t]}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowEdit(true)}
+              className="self-start text-xs text-primary underline"
+            >
+              Edit
+            </button>
           )}
+
+          {poll && <PollSection poll={poll} />}
 
           <div>
             <p className="mb-1 text-xs font-medium text-text-dim">Who's in</p>
@@ -325,6 +331,12 @@ export function ActivityCard({ activity, haloColor }: { activity: Activity; halo
             <PhotoGallery activityId={activity.id} photos={photos} />
           </div>
         </div>
+      )}
+
+      {showEdit && (
+        <Suspense fallback={null}>
+          <CreateActivityModal activity={activity} onClose={() => setShowEdit(false)} />
+        </Suspense>
       )}
     </div>
   )
