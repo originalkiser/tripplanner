@@ -22,19 +22,21 @@ export function ActivityQuickView({ activityId, onClose }: { activityId: string;
       onClick={onClose}
     >
       <div
-        className="max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-bg p-4 sm:rounded-2xl"
+        className="flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-bg sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-2 flex justify-end">
+        <div className="flex shrink-0 justify-end p-2">
           <button type="button" onClick={onClose} className="text-2xl leading-none opacity-60">
             &times;
           </button>
         </div>
-        {activity ? (
-          <ActivityCard activity={activity} highlightId={activityId} />
-        ) : (
-          <p className="p-4 text-center text-sm text-text-dim">{loading ? 'Loading…' : "Couldn't find that activity."}</p>
-        )}
+        <div className="flex-1 overflow-y-auto p-4 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          {activity ? (
+            <ActivityCard activity={activity} highlightId={activityId} />
+          ) : (
+            <p className="p-4 text-center text-sm text-text-dim">{loading ? 'Loading…' : "Couldn't find that activity."}</p>
+          )}
+        </div>
       </div>
     </div>
   )

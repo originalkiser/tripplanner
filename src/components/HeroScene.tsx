@@ -40,8 +40,8 @@ export function HeroScene() {
         <rect x="0" y="92" width="420" height="38" fill="url(#water-day)" />
         <rect x="0" y="90" width="420" height="2.5" fill="#fbdfb0" opacity="0.6" />
 
-        <Palm x={38} baseY={92} height={70} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
-        <Palm x={396} baseY={92} height={58} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+        <Palm x={38} baseY={92} height={42} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+        <Palm x={396} baseY={92} height={35} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
       </svg>
 
       <svg
@@ -82,8 +82,8 @@ export function HeroScene() {
         <rect x="0" y="92" width="420" height="38" fill="url(#water-night)" />
         <rect x="0" y="90" width="420" height="2.5" fill="#234450" opacity="0.8" />
 
-        <Palm x={38} baseY={92} height={70} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
-        <Palm x={396} baseY={92} height={58} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+        <Palm x={38} baseY={92} height={42} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+        <Palm x={396} baseY={92} height={35} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
       </svg>
     </div>
   )
@@ -117,7 +117,12 @@ interface PalmProps {
 // lives on an *inner* `<g>` with no attribute transform of its own, because
 // a CSS `transform` (from the keyframe animation) replaces rather than
 // composes with an element's SVG `transform` attribute — putting both on
-// the same node silently discards the positioning translate.
+// the same node silently discards the positioning translate. The sway's
+// `transform-origin` is set in plain SVG user units (not a percentage) so
+// it pivots at this group's own local (0,0) — the trunk-top attachment
+// point — instead of a corner of the frond blades' combined bounding box,
+// which is offset from that point and made the sway look like a sideways
+// slide instead of a clean rotation.
 function Palm({ x, baseY, height, trunk, fronds, mirror }: PalmProps) {
   const dir = mirror ? -1 : 1
   const topY = -height

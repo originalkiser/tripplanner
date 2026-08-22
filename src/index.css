@@ -114,7 +114,12 @@ h4 {
 }
 
 .scene-palm .scene-fronds {
-  transform-origin: 0% 100%;
+  /* Plain SVG user units, not a percentage — this pivots at this group's
+     own local (0,0), the trunk-top attachment point. A percentage would
+     resolve against the frond blades' combined bounding box instead, whose
+     corner sits well away from that point and made the sway read as a
+     sideways slide instead of a clean pivot. */
+  transform-origin: 0px 0px;
   animation: scene-sway 5s ease-in-out infinite;
 }
 
