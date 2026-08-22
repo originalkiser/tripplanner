@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { useWeatherStore } from '../../stores/weatherStore'
+import { TRIP_DAYS } from '../../lib/days'
+import { weatherIcon, weatherLabel } from '../../lib/weather'
 
 interface Stay {
   trip_id: string
@@ -14,9 +18,12 @@ interface Stay {
 
 export function HomePage() {
   const profile = useAuthStore((s) => s.profile)
+  const weatherDaily = useWeatherStore((s) => s.daily)
+  const fetchWeather = useWeatherStore((s) => s.fetch)
   const [stay, setStay] = useState<Stay | null>(null)
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showWeather, setShowWeather] = useState(false)
 
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
@@ -28,6 +35,10 @@ export function HomePage() {
   useEffect(() => {
     void load()
   }, [])
+
+  useEffect(() => {
+    void fetchWeather()
+  }, [fetchWeather])
 
   async function load() {
     setLoading(true)
@@ -89,6 +100,69 @@ export function HomePage() {
     <div className="mx-auto max-w-md p-4 pb-24">
       <h1 className="text-2xl font-semibold text-primary">Home</h1>
       <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Link
+          to="/"
+          className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          <TodayIcon />
+          <span className="text-xs font-medium">Today's Plans</span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => setShowWeather((v) => !v)}
+          className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          <span className="text-xl leading-none">
+            {weatherDaily[TRIP_DAYS[0].date] ? weatherIcon(weatherDaily[TRIP_DAYS[0].date].code) : '🌤️'}
+          </span>
+          <span className="text-xs font-medium">Weather</span>
+        </button>
+        <Link
+          to="/map"
+          className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          <MapQuickIcon />
+          <span className="text-xs font-medium">Map</span>
+        </Link>
+        <Link
+          to="/album"
+          className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          <AlbumQuickIcon />
+          <span className="text-xs font-medium">Album</span>
+        </Link>
+      </div>
+
+      {showWeather && (
+        <div className="card-shadow mt-2 rounded-xl border border-line bg-surface p-3">
+          {TRIP_DAYS.every((d) => !weatherDaily[d.date]) ? (
+            <p className="text-sm text-text-dim">Forecast isn't available yet — it opens up about two weeks out.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {TRIP_DAYS.map((d) => {
+                const w = weatherDaily[d.date]?.code != null ? weatherDaily[d.date] : undefined
+                return (
+                  <li key={d.date} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.color }} />
+                      {d.shortLabel}
+                    </span>
+                    {w ? (
+                      <span className="font-data flex items-center gap-1.5 text-text-dim">
+                        {weatherIcon(w.code)} {weatherLabel(w.code)} · {w.tempMaxF}&deg;/{w.tempMinF}&deg;
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-dim">Not available yet</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {!editing && hasDetails && (
         <div className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
@@ -171,5 +245,34 @@ export function HomePage() {
         </form>
       )}
     </div>
+  )
+}
+
+function TodayIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
+      <circle cx="12" cy="15" r="2.5" />
+    </svg>
+  )
+}
+
+function MapQuickIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+      <path d="M9 4v14M15 6v14" />
+    </svg>
+  )
+}
+
+function AlbumQuickIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="m21 16-5-4-4 3-3-2-6 5" />
+    </svg>
   )
 }

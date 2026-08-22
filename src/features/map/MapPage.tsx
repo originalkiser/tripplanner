@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Map as MaplibreMap, Marker, Popup, type GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { osmRasterStyle } from '../../lib/mapStyle'
@@ -6,7 +7,7 @@ import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { fetchRoute, formatDistance, formatDuration, setIntegrationKey } from '../../lib/routing'
-import { TRIP_DAYS } from '../../lib/days'
+import { TRIP_DAYS, dayColor } from '../../lib/days'
 
 const CATEGORY_COLOR: Record<string, string> = {
   savannah: 'var(--color-savannah)',
@@ -42,6 +43,9 @@ export function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MaplibreMap | null>(null)
   const markersRef = useRef<Marker[]>([])
+  const markersByIdRef = useRef<Map<string, Marker>>(new Map())
+  const deepLinkHandledRef = useRef(false)
+  const initialActivityIdRef = useRef<string | null>(new URLSearchParams(window.location.search).get('activity'))
 
   const todayIso = new Date().toISOString().slice(0, 10)
   const todayInRange = TRIP_DAYS.some((d) => d.date === todayIso)
@@ -55,6 +59,9 @@ export function MapPage() {
   const [routeError, setRouteError] = useState<string | null>(null)
   const [orsKeyInput, setOrsKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
+  const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     void fetchActivities()
@@ -82,6 +89,7 @@ export function MapPage() {
 
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
+    markersByIdRef.current = new Map()
 
     if (located.length === 0) return
 
@@ -100,7 +108,13 @@ export function MapPage() {
         .setPopup(popup)
         .addTo(map)
       markersRef.current.push(marker)
+      markersByIdRef.current.set(activity.id, marker)
     }
+
+    // Skip the fit-everything zoom when a deep link is about to center on one
+    // specific activity instead — otherwise whichever runs second wins the
+    // camera, and that's not guaranteed to be the deep link.
+    if (initialActivityIdRef.current && !deepLinkHandledRef.current) return
 
     try {
       map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 })
@@ -109,6 +123,31 @@ export function MapPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [located.length, routingMode])
+
+  // Deep-link support: `?activity=<id>` (from a card's "View on map" link)
+  // selects and centers on that activity once its marker exists.
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return
+    const id = searchParams.get('activity')
+    if (!id) return
+    const activity = located.find((a) => a.id === id)
+    if (!activity) return
+    deepLinkHandledRef.current = true
+    selectActivity(activity)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [located.length, searchParams])
+
+  function selectActivity(activity: Activity) {
+    setSelectedActivityId(activity.id)
+    setSidebarOpen(false)
+    const map = mapRef.current
+    const marker = markersByIdRef.current.get(activity.id)
+    if (map && activity.location_lat != null && activity.location_lng != null) {
+      map.flyTo({ center: [activity.location_lng, activity.location_lat], zoom: 15, duration: 600 })
+    }
+    const popup = marker?.getPopup()
+    if (marker && popup && !popup.isOpen()) marker.togglePopup()
+  }
 
   function popupHtml(activity: Activity): string {
     const time = activity.proposed_time ? formatTime(activity.proposed_time) : 'No time set'
@@ -119,9 +158,9 @@ export function MapPage() {
     const primaryLabel = isIOS() ? 'Apple Maps' : 'Google Maps'
     const secondaryLabel = isIOS() ? 'Google Maps' : 'Apple Maps'
     return `
-      <div style="font-family:system-ui;min-width:180px">
-        <strong>${escapeHtml(activity.name)}</strong><br/>
-        <span style="font-size:12px;opacity:0.7">${time}</span><br/>
+      <div style="font-family:system-ui;min-width:180px;color:#1f2a2e">
+        <strong style="color:#1f2a2e">${escapeHtml(activity.name)}</strong><br/>
+        <span style="font-size:12px;color:#5c6b6e">${time}</span><br/>
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
           <a href="${primaryUrl}" target="_blank" rel="noreferrer" style="color:#1B7A8C;font-size:12px">Open in ${primaryLabel}</a>
           <a href="${secondaryUrl}" target="_blank" rel="noreferrer" style="color:#1B7A8C;font-size:12px">Open in ${secondaryLabel}</a>
@@ -131,7 +170,10 @@ export function MapPage() {
   }
 
   function onMarkerClick(activity: Activity) {
-    if (routingMode !== 'pair') return
+    if (routingMode !== 'pair') {
+      setSelectedActivityId(activity.id)
+      return
+    }
     setPairSelection((prev) => {
       const next = prev.find((a) => a.id === activity.id)
         ? prev.filter((a) => a.id !== activity.id)
@@ -241,9 +283,16 @@ export function MapPage() {
     else if (pairSelection.length === 2) await runRoute(pairSelection)
   }
 
+  const sortedLocated = [...located].sort((a, b) => {
+    const dateCmp = (a.proposed_date ?? 'zzzz').localeCompare(b.proposed_date ?? 'zzzz')
+    if (dateCmp !== 0) return dateCmp
+    return (a.proposed_time ?? 'zz').localeCompare(b.proposed_time ?? 'zz')
+  })
+
   return (
-    <div className="relative h-full">
-      <div ref={containerRef} className="h-[calc(100svh-64px)] w-full" />
+    <div className="relative flex h-full">
+      <div className="relative flex-1">
+        <div ref={containerRef} className="h-[calc(100svh-64px)] w-full" />
 
       <div className="absolute left-2 right-2 top-2 flex flex-col gap-2">
         <div className="flex gap-2 rounded-xl bg-surface p-2 shadow-md">
@@ -255,6 +304,14 @@ export function MapPage() {
             }`}
           >
             Route today's stops
+          </button>
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Show locations list"
+            className="rounded-lg bg-bg px-2 py-1.5 text-xs font-medium md:hidden"
+          >
+            <HamburgerIcon />
           </button>
           <button
             type="button"
@@ -386,7 +443,63 @@ export function MapPage() {
           </button>
         )}
       </div>
+      </div>
+
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 right-0 z-40 w-72 transform border-l border-line bg-surface shadow-xl transition-transform duration-200 md:relative md:z-0 md:translate-x-0 md:shadow-none ${
+          sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between border-b border-line p-3 md:hidden">
+          <h2 className="font-heading text-sm font-semibold">Locations</h2>
+          <button type="button" onClick={() => setSidebarOpen(false)} className="text-2xl leading-none opacity-60">
+            &times;
+          </button>
+        </div>
+        <div className="h-[calc(100svh-64px)] overflow-y-auto p-2">
+          {sortedLocated.length === 0 && (
+            <p className="p-3 text-xs text-text-dim">No located items yet.</p>
+          )}
+          {sortedLocated.map((a) => {
+            const selected = selectedActivityId === a.id
+            return (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => selectActivity(a)}
+                className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${
+                  selected ? 'bg-primary text-white' : 'text-text hover:bg-bg'
+                }`}
+              >
+                <span
+                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                  style={{ background: dayColor(a.proposed_date) ?? '#999' }}
+                />
+                <span className="flex-1 truncate">{a.name}</span>
+                <span className={`shrink-0 text-[10px] ${selected ? 'text-white/80' : 'text-text-dim'}`}>
+                  {a.proposed_time ? formatTime(a.proposed_time) : ''}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </aside>
     </div>
+  )
+}
+
+function HamburgerIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
   )
 }
 

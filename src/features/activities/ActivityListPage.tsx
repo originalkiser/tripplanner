@@ -92,7 +92,8 @@ export function ActivityListPage() {
             {TRIP_DAYS.map((day) => {
               const dayActivities = byDay(day.date)
               if (dayActivities.length === 0) return null
-              const weather = day.date !== today ? weatherDaily[day.date] : undefined
+              const dayWeather = weatherDaily[day.date]
+              const weather = day.date !== today && dayWeather?.code != null ? dayWeather : undefined
               return (
                 <section key={day.date} className="mt-4">
                   <h2 className="mb-2 flex items-center gap-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
