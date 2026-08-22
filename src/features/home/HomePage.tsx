@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { useWeatherStore } from '../../stores/weatherStore'
+import { usePollsStore, pendingPolls } from '../../stores/pollsStore'
+import { usePollSnoozeStore } from '../../stores/pollSnoozeStore'
+import { usePendingPollCount } from '../polls/usePendingPollCount'
+import { PollSection } from '../polls/PollSection'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
 
@@ -20,6 +24,10 @@ export function HomePage() {
   const profile = useAuthStore((s) => s.profile)
   const weatherDaily = useWeatherStore((s) => s.daily)
   const fetchWeather = useWeatherStore((s) => s.fetch)
+  const allPolls = usePollsStore((s) => s.all)
+  const { snooze } = usePollSnoozeStore()
+  const pendingPollCount = usePendingPollCount()
+  const myPendingPolls = profile ? pendingPolls(allPolls, profile.id) : []
   const [stay, setStay] = useState<Stay | null>(null)
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -101,7 +109,7 @@ export function HomePage() {
       <h1 className="text-2xl font-semibold text-primary">Home</h1>
       <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
         <Link
           to="/"
           className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
@@ -133,6 +141,18 @@ export function HomePage() {
           <AlbumQuickIcon />
           <span className="text-xs font-medium">Album</span>
         </Link>
+        <a
+          href="#notifications"
+          className="card-shadow relative flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          {pendingPollCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1 text-[10px] font-semibold text-white">
+              {pendingPollCount}
+            </span>
+          )}
+          <NotificationsIcon />
+          <span className="text-xs font-medium">Notifications</span>
+        </a>
       </div>
 
       {showWeather && (
@@ -163,6 +183,38 @@ export function HomePage() {
           )}
         </div>
       )}
+
+      <div id="notifications" className="mt-4 scroll-mt-4">
+        <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
+          Notifications {pendingPollCount > 0 && `(${pendingPollCount})`}
+        </h2>
+        {myPendingPolls.length === 0 ? (
+          <p className="card-shadow rounded-xl border border-dashed border-line bg-surface p-4 text-center text-sm text-text-dim">
+            You're all caught up — no polls waiting on you.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {myPendingPolls.map((poll) => (
+              <div key={poll.id} className="card-shadow rounded-xl border border-line bg-surface p-3">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-text-dim">⏱ Vote on a time</p>
+                    <h3 className="font-heading text-base font-semibold">{poll.activity?.name}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => snooze(poll.id)}
+                    className="shrink-0 whitespace-nowrap rounded-full bg-bg px-2 py-1 text-[11px] font-medium text-text-dim"
+                  >
+                    Remind me later
+                  </button>
+                </div>
+                <PollSection poll={poll} compact />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {!editing && hasDetails && (
         <div className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
@@ -254,6 +306,15 @@ function TodayIcon() {
       <rect x="3" y="4" width="18" height="17" rx="2" />
       <path d="M3 9h18M8 2v4M16 2v4" />
       <circle cx="12" cy="15" r="2.5" />
+    </svg>
+  )
+}
+
+function NotificationsIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.7 21a2 2 0 0 1-3.4 0" />
     </svg>
   )
 }

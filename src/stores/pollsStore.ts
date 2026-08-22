@@ -26,6 +26,13 @@ export interface Poll {
   votes: PollVote[]
 }
 
+// Polls this user hasn't voted on yet — the shared definition of "pending"
+// used for the notification stack, the Home badge, and the Home
+// notifications section, so all three agree on what counts.
+export function pendingPolls(all: Poll[], userId: string): Poll[] {
+  return all.filter((p) => p.activity && !p.votes.some((v) => v.user_id === userId))
+}
+
 const SELECT = `
   id, activity_id, created_by,
   activity:activities(id, name),

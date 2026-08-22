@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
 import { PollStack } from '../../features/polls/PollStack'
+import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 
 // Pulls in MapLibre (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -30,6 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const [showCreate, setShowCreate] = useState(false)
   const showGlobalAdd = !HIDE_GLOBAL_ADD.includes(location.pathname)
+  const pendingPollCount = usePendingPollCount()
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
@@ -46,9 +48,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           type="button"
           onClick={() => setShowCreate(true)}
           aria-label="Add activity"
-          className="card-shadow fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white"
+          className="card-shadow fixed bottom-16 right-4 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-white"
         >
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
@@ -74,16 +76,21 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <NavLink
           to="/home"
-          className="absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5"
+          className="absolute left-1/2 -top-2.5 flex -translate-x-1/2 flex-col items-center gap-0.5"
         >
           {({ isActive }) => (
             <>
               <div
-                className={`card-shadow flex h-14 w-14 items-center justify-center rounded-full text-white ${
+                className={`card-shadow relative flex h-10 w-10 items-center justify-center rounded-full text-white ${
                   isActive ? 'bg-coral' : 'bg-accent'
                 }`}
               >
                 <HomeIcon active={isActive} />
+                {pendingPollCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-white">
+                    {pendingPollCount}
+                  </span>
+                )}
               </div>
               <span className={`text-[10px] font-medium ${isActive ? 'text-coral' : 'text-text-dim'}`}>
                 Home

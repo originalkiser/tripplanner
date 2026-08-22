@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
-import { usePollsStore } from '../../stores/pollsStore'
+import { usePollsStore, pendingPolls } from '../../stores/pollsStore'
+import { usePollSnoozeStore } from '../../stores/pollSnoozeStore'
 import { PollSection } from './PollSection'
 
 const EXIT_OFFSETS = [
@@ -12,6 +13,7 @@ const EXIT_OFFSETS = [
 export function PollStack() {
   const profile = useAuthStore((s) => s.profile)
   const { all, fetchAllForUser } = usePollsStore()
+  const { isSnoozed, snooze } = usePollSnoozeStore()
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [exiting, setExiting] = useState<{ pollId: string; offset: (typeof EXIT_OFFSETS)[number] } | null>(
     null,
@@ -23,22 +25,27 @@ export function PollStack() {
 
   const pending = useMemo(() => {
     if (!profile) return []
-    return all
-      .filter((p) => p.activity)
-      .filter((p) => !p.votes.some((v) => v.user_id === profile.id))
+    return pendingPolls(all, profile.id)
       .filter((p) => !dismissed.has(p.id))
+      .filter((p) => !isSnoozed(p.id))
       .slice(0, 3)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all, profile, dismissed])
 
   if (pending.length === 0) return null
 
-  function onVoted(pollId: string) {
+  function dismissCard(pollId: string) {
     const offset = EXIT_OFFSETS[Math.floor(Math.random() * EXIT_OFFSETS.length)]
     setExiting({ pollId, offset })
     setTimeout(() => {
       setDismissed((prev) => new Set(prev).add(pollId))
       setExiting(null)
     }, 320)
+  }
+
+  function handleRemindLater(pollId: string) {
+    snooze(pollId)
+    dismissCard(pollId)
   }
 
   return (
@@ -66,9 +73,22 @@ export function PollStack() {
                 }`}
                 style={style}
               >
-                <p className="text-xs font-medium text-text-dim">⏱ Vote on a time</p>
-                <h3 className="mb-2 font-heading text-lg font-semibold">{poll.activity?.name}</h3>
-                <PollSection poll={poll} compact onVoted={() => isTop && onVoted(poll.id)} />
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-medium text-text-dim">⏱ Vote on a time</p>
+                    <h3 className="font-heading text-lg font-semibold">{poll.activity?.name}</h3>
+                  </div>
+                  {isTop && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemindLater(poll.id)}
+                      className="shrink-0 whitespace-nowrap rounded-full bg-bg px-2 py-1 text-[11px] font-medium text-text-dim"
+                    >
+                      Remind me later
+                    </button>
+                  )}
+                </div>
+                <PollSection poll={poll} compact onVoted={() => isTop && dismissCard(poll.id)} />
               </div>
             )
           })
