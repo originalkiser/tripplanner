@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
+import { UpdateBanner } from '../UpdateBanner'
 import { PollStack } from '../../features/polls/PollStack'
 
 // Pulls in MapLibre (for the location-confirm preview) — keep it out of the
@@ -33,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
       <HeroScene />
+      <UpdateBanner />
       <PollStack />
 
       <main className="relative z-10 flex-1 overflow-y-auto pt-[var(--scene-h)]">

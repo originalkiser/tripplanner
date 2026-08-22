@@ -16,6 +16,14 @@ function minutesFromMidnight(time: string): number {
   return h * 60 + m
 }
 
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
 // Outlook/Teams-style week grid: one column per trip day, events placed at
 // their approximate vertical time position. Activities without a time land
 // in an "all day" strip at the top of their column.
@@ -79,16 +87,26 @@ export function PlannedCalendarView({
                   const mins = minutesFromMidnight(a.proposed_time!)
                   const top = ((mins - START_HOUR * 60) / 60) * ROW_HEIGHT
                   if (top < -ROW_HEIGHT || top > gridHeight) return null
+                  // Activities created before duration tracking existed (or
+                  // left it unset) fall back to a plain 1-hour block instead
+                  // of collapsing to a sliver.
+                  const durationMin = a.duration_minutes ?? 60
+                  const height = Math.max((durationMin / 60) * ROW_HEIGHT - 4, 18)
                   return (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => onSelect(a.id)}
-                      className="card-shadow absolute left-0.5 right-0.5 truncate rounded-md px-1.5 py-1 text-left text-[11px] font-medium text-white"
-                      style={{ top: Math.max(top, 0), background: day.color, height: ROW_HEIGHT - 6 }}
+                      className="card-shadow absolute left-0.5 right-0.5 overflow-hidden rounded-md px-1.5 py-1 text-left text-[11px] font-medium leading-tight text-white"
+                      style={{ top: Math.max(top, 0), background: day.color, height }}
                       title={a.name}
                     >
-                      {a.name}
+                      <span className="block truncate">{a.name}</span>
+                      {height >= ROW_HEIGHT && (
+                        <span className="block truncate text-[10px] font-normal opacity-85">
+                          {formatDuration(durationMin)}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

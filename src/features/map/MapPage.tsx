@@ -7,7 +7,7 @@ import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { fetchRoute, formatDistance, formatDuration, setIntegrationKey } from '../../lib/routing'
-import { TRIP_DAYS, dayColor } from '../../lib/days'
+import { TRIP_DAYS } from '../../lib/days'
 
 const CATEGORY_COLOR: Record<string, string> = {
   savannah: 'var(--color-savannah)',
@@ -283,11 +283,21 @@ export function MapPage() {
     else if (pairSelection.length === 2) await runRoute(pairSelection)
   }
 
-  const sortedLocated = [...located].sort((a, b) => {
-    const dateCmp = (a.proposed_date ?? 'zzzz').localeCompare(b.proposed_date ?? 'zzzz')
-    if (dateCmp !== 0) return dateCmp
-    return (a.proposed_time ?? 'zz').localeCompare(b.proposed_time ?? 'zz')
-  })
+  const byTime = (a: Activity, b: Activity) => (a.proposed_time ?? 'zz').localeCompare(b.proposed_time ?? 'zz')
+  const locatedGroups: { key: string; label: string; color: string | null; items: Activity[] }[] = [
+    ...TRIP_DAYS.map((d) => ({
+      key: d.date,
+      label: d.shortLabel,
+      color: d.color,
+      items: located.filter((a) => a.proposed_date === d.date).sort(byTime),
+    })),
+    {
+      key: 'unscheduled',
+      label: 'Not yet scheduled',
+      color: null,
+      items: located.filter((a) => !TRIP_DAYS.some((d) => d.date === a.proposed_date)).sort(byTime),
+    },
+  ].filter((g) => g.items.length > 0)
 
   return (
     <div className="relative flex h-full">
@@ -464,31 +474,37 @@ export function MapPage() {
           </button>
         </div>
         <div className="h-[calc(100svh-64px)] overflow-y-auto p-2">
-          {sortedLocated.length === 0 && (
+          {locatedGroups.length === 0 && (
             <p className="p-3 text-xs text-text-dim">No located items yet.</p>
           )}
-          {sortedLocated.map((a) => {
-            const selected = selectedActivityId === a.id
-            return (
-              <button
-                key={a.id}
-                type="button"
-                onClick={() => selectActivity(a)}
-                className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${
-                  selected ? 'bg-primary text-white' : 'text-text hover:bg-bg'
-                }`}
-              >
-                <span
-                  className="inline-block h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: dayColor(a.proposed_date) ?? '#999' }}
-                />
-                <span className="flex-1 truncate">{a.name}</span>
-                <span className={`shrink-0 text-[10px] ${selected ? 'text-white/80' : 'text-text-dim'}`}>
-                  {a.proposed_time ? formatTime(a.proposed_time) : ''}
-                </span>
-              </button>
-            )
-          })}
+          {locatedGroups.map((group) => (
+            <div key={group.key} className="mb-3">
+              <h3 className="mb-1 flex items-center gap-1.5 px-2 text-xs font-semibold uppercase tracking-wide text-text-dim">
+                {group.color && (
+                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: group.color }} />
+                )}
+                {group.label}
+              </h3>
+              {group.items.map((a) => {
+                const selected = selectedActivityId === a.id
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => selectActivity(a)}
+                    className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${
+                      selected ? 'bg-primary text-white' : 'text-text hover:bg-bg'
+                    }`}
+                  >
+                    <span className="flex-1 truncate">{a.name}</span>
+                    <span className={`shrink-0 text-[10px] ${selected ? 'text-white/80' : 'text-text-dim'}`}>
+                      {a.proposed_time ? formatTime(a.proposed_time) : ''}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </aside>
     </div>

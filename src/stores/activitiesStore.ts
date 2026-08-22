@@ -24,6 +24,7 @@ export interface Activity {
   description: string | null
   proposed_date: string | null
   proposed_time: string | null
+  duration_minutes: number | null
   location_name: string | null
   location_lat: number | null
   location_lng: number | null
@@ -46,6 +47,7 @@ export interface ActivityFields {
   description: string | null
   proposedDate: string | null
   proposedTime: string | null
+  durationMinutes: number | null
   locationName: string | null
   locationLat: number | null
   locationLng: number | null
@@ -93,6 +95,7 @@ function toRow(input: ActivityFields) {
     description: input.description,
     proposed_date: input.proposedDate,
     proposed_time: input.proposedTime,
+    duration_minutes: input.durationMinutes,
     location_name: input.locationName,
     location_lat: input.locationLat,
     location_lng: input.locationLng,

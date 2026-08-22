@@ -14,6 +14,20 @@ const TYPE_OPTIONS: { value: ActivityType; label: string }[] = [
   { value: 'food_and_activity', label: 'Food & Activity' },
 ]
 
+const DURATION_OPTIONS: { value: string; label: string }[] = [
+  { value: '', label: 'Not set' },
+  { value: '30', label: '30 min' },
+  { value: '60', label: '1 hr' },
+  { value: '90', label: '1.5 hr' },
+  { value: '120', label: '2 hr' },
+  { value: '150', label: '2.5 hr' },
+  { value: '180', label: '3 hr' },
+  { value: '240', label: '4 hr' },
+  { value: '300', label: '5 hr' },
+  { value: '360', label: '6 hr' },
+  { value: '480', label: 'All day (8 hr)' },
+]
+
 const RATING_LABELS: Record<number, string> = {
   1: 'Would be nice',
   2: 'Interested',
@@ -45,6 +59,9 @@ export function CreateActivityModal({
   const [name, setName] = useState(activity?.name ?? '')
   const [date, setDate] = useState(activity?.proposed_date ?? '')
   const [time, setTime] = useState(activity?.proposed_time?.slice(0, 5) ?? '')
+  const [duration, setDuration] = useState(
+    activity?.duration_minutes != null ? String(activity.duration_minutes) : '',
+  )
   const [description, setDescription] = useState(activity?.description ?? '')
   const [rating, setRating] = useState<number | null>(null)
   const [linkUrl, setLinkUrl] = useState(activity?.link_url ?? '')
@@ -132,6 +149,7 @@ export function CreateActivityModal({
       description: description.trim() || null,
       proposedDate: unscheduled ? null : date || null,
       proposedTime: unscheduled ? null : time || null,
+      durationMinutes: unscheduled ? null : duration ? parseInt(duration, 10) : null,
       locationName: selectedLocation?.displayName ?? (locationQuery.trim() || null),
       locationLat: selectedLocation?.lat ?? null,
       locationLng: selectedLocation?.lng ?? null,
@@ -262,19 +280,33 @@ export function CreateActivityModal({
           </div>
 
           {!unscheduled && (
-            <div className="flex gap-2">
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
-              />
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
-              />
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
+                />
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  className="flex-1 rounded-lg border border-line bg-bg px-3 py-2"
+                />
+              </div>
+              <select
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                aria-label="Duration"
+                className="w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm"
+              >
+                {DURATION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label === 'Not set' ? 'Duration: not set' : `Duration: ${opt.label}`}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

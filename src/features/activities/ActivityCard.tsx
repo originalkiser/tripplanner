@@ -39,6 +39,14 @@ function avgRating(activity: Activity): number | null {
   return rated.reduce((sum, p) => sum + (p.rating ?? 0), 0) / rated.length
 }
 
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
 function formatTime(time: string | null): string {
   if (!time) return ''
   const [h, m] = time.split(':')
@@ -146,6 +154,7 @@ export function ActivityCard({
             <h3 className="mt-1 font-heading text-lg font-semibold">{activity.name}</h3>
             <p className="font-data text-xs text-text-dim">
               {activity.proposed_time ? formatTime(activity.proposed_time) : 'No time set'}
+              {activity.proposed_time && activity.duration_minutes != null && ` · ${formatDuration(activity.duration_minutes)}`}
               {rating != null && ` · ${rating.toFixed(1)}★`}
             </p>
           </div>

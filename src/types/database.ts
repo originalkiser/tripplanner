@@ -86,6 +86,7 @@ export interface Database {
           description: string | null
           proposed_date: string | null
           proposed_time: string | null
+          duration_minutes: number | null
           location_name: string | null
           location_lat: number | null
           location_lng: number | null
@@ -107,6 +108,7 @@ export interface Database {
           description?: string | null
           proposed_date?: string | null
           proposed_time?: string | null
+          duration_minutes?: number | null
           location_name?: string | null
           location_lat?: number | null
           location_lng?: number | null

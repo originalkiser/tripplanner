@@ -94,7 +94,11 @@ h4 {
   inset-inline: 0;
   top: 0;
   height: var(--scene-h);
-  z-index: 0;
+  /* Higher than <main>'s z-10 (see AppShell) — <main> is a scrolling
+     sibling, not an ancestor, so once its content scrolls up into this
+     strip it needs to lose the paint order fight, or the scene gets
+     painted *under* scrolled-past cards instead of masking them. */
+  z-index: 15;
   pointer-events: none;
   overflow: hidden;
 }
