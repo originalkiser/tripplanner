@@ -103,6 +103,7 @@ interface ActivitiesState {
     rating: number,
   ) => Promise<{ error: string | null }>
   leaveActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
+  adoptProposedTime: (activityId: string, date: string, time: string) => Promise<{ error: string | null }>
   inviteParticipants: (activityId: string, userIds: string[]) => Promise<{ error: string | null }>
   respondToInvite: (activityId: string, userId: string, accept: boolean) => Promise<{ error: string | null }>
 }
@@ -124,17 +125,29 @@ function toRow(input: ActivityFields) {
   }
 }
 
+// Every action below re-fetches the full list afterward, and several can
+// fire close together (join, then someone else's edit lands a moment
+// later). Without this, a slower-but-earlier request can resolve *after*
+// a faster-but-later one and stomp its results with stale data — e.g. a
+// just-recorded join briefly disappearing because an in-flight edit's
+// refetch (issued before the join happened) won the race. Only the
+// latest-issued request is allowed to write to state.
+let fetchGeneration = 0
+
 export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
   activities: [],
   loading: false,
 
   fetchActivities: async () => {
+    const generation = ++fetchGeneration
     set({ loading: true })
     const { data, error } = await supabase
       .from('activities')
       .select(SELECT)
       .order('proposed_date', { ascending: true, nullsFirst: false })
       .order('proposed_time', { ascending: true, nullsFirst: false })
+
+    if (generation !== fetchGeneration) return
 
     if (error) {
       console.error(error)
@@ -221,6 +234,16 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       .delete()
       .eq('activity_id', activityId)
       .eq('user_id', userId)
+    if (error) return { error: error.message }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  adoptProposedTime: async (activityId, date, time) => {
+    const { error } = await supabase
+      .from('activities')
+      .update({ proposed_date: date, proposed_time: time })
+      .eq('id', activityId)
     if (error) return { error: error.message }
     await get().fetchActivities()
     return { error: null }

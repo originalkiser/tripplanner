@@ -39,6 +39,12 @@ export function ActivityListPage() {
   const plannedCount = TRIP_DAYS.reduce((sum, d) => sum + byDay(d.date).length, 0)
   const today = todayIso()
 
+  // Still unplanned, but someone's suggested a day/time for it — surfaced
+  // here too so it's not only reachable from the Unplanned tab.
+  const proposedPlans = filtered.filter(
+    (a) => !a.proposed_date && a.participants.some((p) => p.status === 'proposed_alt_time'),
+  )
+
   return (
     <div className="mx-auto max-w-6xl pb-24">
       <div className="sticky top-0 z-20 bg-bg px-4 pb-3 pt-4 shadow-sm">
@@ -118,6 +124,23 @@ export function ActivityListPage() {
               <p className="mt-8 text-center text-sm text-text-dim">
                 Nothing scheduled yet — check the Unplanned tab for ideas, or add something new.
               </p>
+            )}
+
+            {proposedPlans.length > 0 && (
+              <section className="mt-4">
+                <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
+                  Proposed Plans
+                </h2>
+                <p className="-mt-1 mb-2 text-xs text-text-dim">
+                  Not on the calendar yet — someone's suggested a time. Click a proposed time on a
+                  card to make it official.
+                </p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {proposedPlans.map((a) => (
+                    <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+                  ))}
+                </div>
+              </section>
             )}
           </>
         )}

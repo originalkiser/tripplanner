@@ -66,7 +66,7 @@ export function ActivityCard({
   highlightId?: string | null
 }) {
   const profile = useAuthStore((s) => s.profile)
-  const { joinActivity, proposeAltTime, rateActivity, leaveActivity } = useActivitiesStore()
+  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, adoptProposedTime } = useActivitiesStore()
 
   const [expanded, setExpanded] = useState(false)
   const [proposing, setProposing] = useState(false)
@@ -100,7 +100,7 @@ export function ActivityCard({
   const mine = profile ? activity.participants.find((p) => p.user_id === profile.id) : undefined
   const joined = activity.participants.filter((p) => p.status === 'joined')
   const proposedAlts = activity.participants.filter((p) => p.status === 'proposed_alt_time')
-  const canEdit = profile && (profile.id === activity.created_by || profile.is_admin)
+  const canEdit = !!profile
 
   async function handleJoin() {
     if (!profile) return
@@ -125,6 +125,17 @@ export function ActivityCard({
     setProposing(false)
   }
 
+  function openProposeForm() {
+    setExpanded(true)
+    setProposing(true)
+  }
+
+  async function handleAdoptProposedTime(date: string, time: string) {
+    setBusy(true)
+    await adoptProposedTime(activity.id, date, time)
+    setBusy(false)
+  }
+
   async function handleRate(n: number) {
     if (!profile) return
     setBusy(true)
@@ -141,7 +152,18 @@ export function ActivityCard({
         boxShadow: haloColor ? `0 0 0 1px ${haloColor}22, var(--shadow-card)` : undefined,
       }}
     >
-      <button type="button" onClick={() => setExpanded((v) => !v)} className="w-full text-left">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setExpanded((v) => !v)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setExpanded((v) => !v)
+          }
+        }}
+        className="w-full cursor-pointer text-left"
+      >
         <div className="flex items-start justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
@@ -158,7 +180,7 @@ export function ActivityCard({
               {rating != null && ` · ${rating.toFixed(1)}★`}
             </p>
           </div>
-          {activity.creator && (
+          {activity.creator && activity.source !== 'imported_note' && (
             <div className="flex flex-col items-center gap-1 text-center">
               {activity.creator.avatar_url ? (
                 <img
@@ -191,12 +213,19 @@ export function ActivityCard({
         {proposedAlts.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {proposedAlts.map((p) => (
-              <span
+              <button
                 key={p.user_id}
-                className="rounded-full bg-secondary/10 px-2 py-0.5 text-[11px] text-secondary"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (p.proposed_date && p.proposed_time) void handleAdoptProposedTime(p.proposed_date, p.proposed_time)
+                }}
+                disabled={busy || !p.proposed_date || !p.proposed_time}
+                title="Update to this proposed time"
+                className="rounded-full bg-secondary/10 px-2 py-0.5 text-[11px] text-secondary underline decoration-dotted disabled:no-underline"
               >
                 {p.profile?.display_name} proposed {p.proposed_date} {formatTime(p.proposed_time)}
-              </span>
+              </button>
             ))}
           </div>
         )}
@@ -213,17 +242,49 @@ export function ActivityCard({
             {joined.length} attending
           </span>
         </div>
-      </button>
+      </div>
 
-      {activity.location_lat != null && activity.location_lng != null && (
-        <Link
-          to={`/map?activity=${activity.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="mt-2 inline-flex items-center gap-1 text-xs text-primary underline"
-        >
-          <PinIcon /> View on map
-        </Link>
-      )}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {activity.location_lat != null && activity.location_lng != null ? (
+          <Link
+            to={`/map?activity=${activity.id}`}
+            className="inline-flex items-center gap-1 text-xs text-primary underline"
+          >
+            <PinIcon /> View on map
+          </Link>
+        ) : (
+          <span />
+        )}
+
+        <div className="flex shrink-0 gap-2">
+          <button
+            type="button"
+            onClick={openProposeForm}
+            className="rounded-full bg-bg px-3 py-1 text-xs font-medium"
+          >
+            Propose time
+          </button>
+          {mine ? (
+            <button
+              type="button"
+              onClick={() => void handleLeave()}
+              disabled={busy}
+              className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600 disabled:opacity-50"
+            >
+              Leave
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void handleJoin()}
+              disabled={busy}
+              className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+            >
+              Join
+            </button>
+          )}
+        </div>
+      </div>
 
       {expanded && (
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
