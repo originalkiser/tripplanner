@@ -39,10 +39,13 @@ export function ActivityListPage() {
   const plannedCount = TRIP_DAYS.reduce((sum, d) => sum + byDay(d.date).length, 0)
   const today = todayIso()
 
-  // Still unplanned, but someone's suggested a day/time for it — surfaced
-  // here too so it's not only reachable from the Unplanned tab.
-  const proposedPlans = filtered.filter(
-    (a) => !a.proposed_date && a.participants.some((p) => p.status === 'proposed_alt_time'),
+  // Still unplanned, but someone's already joined or suggested a day/time
+  // for it — surfaced here too instead of only living in the Unplanned
+  // tab, since it's no longer just an idea at that point.
+  const needsScheduling = filtered.filter(
+    (a) =>
+      !a.proposed_date &&
+      a.participants.some((p) => p.status === 'joined' || p.status === 'proposed_alt_time'),
   )
 
   return (
@@ -126,18 +129,18 @@ export function ActivityListPage() {
               </p>
             )}
 
-            {proposedPlans.length > 0 && (
+            {needsScheduling.length > 0 && (
               <section className="mt-4">
                 <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
-                  Proposed Plans
+                  Needs Scheduling
                 </h2>
                 <p className="-mt-1 mb-2 text-xs text-text-dim">
-                  Not on the calendar yet — someone's suggested a time. Click a proposed time on a
-                  card to make it official.
+                  Not on the calendar yet, but people are in — propose a time, or click an already
+                  proposed one to make it official.
                 </p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {proposedPlans.map((a) => (
-                    <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+                  {needsScheduling.map((a) => (
+                    <ActivityCard key={a.id} activity={a} highlightId={highlightId} scheduleCallout />
                   ))}
                 </div>
               </section>

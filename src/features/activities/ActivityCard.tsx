@@ -56,14 +56,27 @@ function formatTime(time: string | null): string {
   return `${hour12}:${m} ${ampm}`
 }
 
+function formatProposedDate(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 export function ActivityCard({
   activity,
   haloColor,
   highlightId,
+  scheduleCallout,
 }: {
   activity: Activity
   haloColor?: string | null
   highlightId?: string | null
+  // Shown on the Planned page's "Needs Scheduling" section — these cards
+  // are still technically unplanned, so call out what's missing (or, if
+  // someone's already proposed a time, that the shown time is tentative).
+  scheduleCallout?: boolean
 }) {
   const profile = useAuthStore((s) => s.profile)
   const { joinActivity, proposeAltTime, rateActivity, leaveActivity, adoptProposedTime } = useActivitiesStore()
@@ -100,6 +113,12 @@ export function ActivityCard({
   const mine = profile ? activity.participants.find((p) => p.user_id === profile.id) : undefined
   const joined = activity.participants.filter((p) => p.status === 'joined')
   const proposedAlts = activity.participants.filter((p) => p.status === 'proposed_alt_time')
+  const earliestProposal = [...proposedAlts]
+    .filter((p) => p.proposed_date && p.proposed_time)
+    .sort(
+      (a, b) =>
+        `${a.proposed_date}T${a.proposed_time}`.localeCompare(`${b.proposed_date}T${b.proposed_time}`),
+    )[0]
   const canEdit = !!profile
 
   async function handleJoin() {
@@ -196,6 +215,18 @@ export function ActivityCard({
           )}
         </div>
 
+        {scheduleCallout && !activity.proposed_date && (
+          <div
+            className={`mt-2 inline-block rounded-lg px-2 py-1 text-xs font-medium ${
+              earliestProposal ? 'bg-accent/15 text-accent' : 'bg-coral/15 text-coral'
+            }`}
+          >
+            {earliestProposal
+              ? `Using proposed time: ${formatProposedDate(earliestProposal.proposed_date!)} · ${formatTime(earliestProposal.proposed_time)}`
+              : 'Day/time needed'}
+          </div>
+        )}
+
         {joined.length > 0 && (
           <div className="mt-2 flex -space-x-2">
             {joined.map((p) => (
@@ -224,7 +255,8 @@ export function ActivityCard({
                 title="Update to this proposed time"
                 className="rounded-full bg-secondary/10 px-2 py-0.5 text-[11px] text-secondary underline decoration-dotted disabled:no-underline"
               >
-                {p.profile?.display_name} proposed {p.proposed_date} {formatTime(p.proposed_time)}
+                {p.profile?.display_name} proposed{' '}
+                {p.proposed_date ? formatProposedDate(p.proposed_date) : ''} {formatTime(p.proposed_time)}
               </button>
             ))}
           </div>
@@ -260,7 +292,11 @@ export function ActivityCard({
           <button
             type="button"
             onClick={openProposeForm}
-            className="rounded-full bg-bg px-3 py-1 text-xs font-medium"
+            className={`rounded-full px-3 py-1 text-xs font-medium ${
+              scheduleCallout && !activity.proposed_date && !earliestProposal
+                ? 'bg-coral text-white'
+                : 'bg-bg'
+            }`}
           >
             Propose time
           </button>
