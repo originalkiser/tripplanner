@@ -7,7 +7,7 @@ import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { fetchRoute, formatDistance, formatDuration, setIntegrationKey } from '../../lib/routing'
-import { TRIP_DAYS } from '../../lib/days'
+import { TRIP_DAYS, dayColor } from '../../lib/days'
 
 const CATEGORY_COLOR: Record<string, string> = {
   savannah: 'var(--color-savannah)',
@@ -20,14 +20,17 @@ const TYPE_ICON: Record<string, string> = {
   food_and_activity: '★',
 }
 
+// The fill still carries category (Savannah/Tybee); the ring is the same
+// per-day color used for the halo border on Planned page cards, so pins
+// for the same day are recognizable across both views at a glance.
 function markerEl(activity: Activity): HTMLDivElement {
   const el = document.createElement('div')
   el.style.width = '30px'
   el.style.height = '30px'
   el.style.borderRadius = '50%'
   el.style.background = CATEGORY_COLOR[activity.category] ?? '#666'
-  el.style.border = '2px solid white'
-  el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)'
+  el.style.border = `3px solid ${dayColor(activity.proposed_date) ?? '#999'}`
+  el.style.boxShadow = '0 0 0 1.5px white, 0 1px 3px rgba(0,0,0,0.4)'
   el.style.display = 'flex'
   el.style.alignItems = 'center'
   el.style.justifyContent = 'center'
@@ -150,7 +153,11 @@ export function MapPage() {
   }
 
   function popupHtml(activity: Activity): string {
-    const time = activity.proposed_time ? formatTime(activity.proposed_time) : 'No time set'
+    const when = activity.proposed_date
+      ? `${formatDate(activity.proposed_date)}${activity.proposed_time ? ` · ${formatTime(activity.proposed_time)}` : ''}`
+      : activity.proposed_time
+        ? formatTime(activity.proposed_time)
+        : 'No time set'
     const gUrl = googleMapsUrl(activity.location_lat!, activity.location_lng!)
     const aUrl = appleMapsUrl(activity.location_lat!, activity.location_lng!)
     const primaryUrl = isIOS() ? aUrl : gUrl
@@ -160,7 +167,7 @@ export function MapPage() {
     return `
       <div style="font-family:system-ui;min-width:180px;color:#1f2a2e">
         <strong style="color:#1f2a2e">${escapeHtml(activity.name)}</strong><br/>
-        <span style="font-size:12px;color:#5c6b6e">${time}</span><br/>
+        <span style="font-size:12px;color:#5c6b6e">${when}</span><br/>
         <div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">
           <a href="${primaryUrl}" target="_blank" rel="noreferrer" style="color:#1B7A8C;font-size:12px">Open in ${primaryLabel}</a>
           <a href="${secondaryUrl}" target="_blank" rel="noreferrer" style="color:#1B7A8C;font-size:12px">Open in ${secondaryLabel}</a>
@@ -525,6 +532,14 @@ function formatTime(time: string): string {
   const ampm = hour >= 12 ? 'PM' : 'AM'
   const hour12 = hour % 12 === 0 ? 12 : hour % 12
   return `${hour12}:${m} ${ampm}`
+}
+
+function formatDate(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function escapeHtml(s: string): string {

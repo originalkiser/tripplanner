@@ -86,7 +86,7 @@ h4 {
    clouds, a twinkling night sky, and a glowing sun or moon. Fixed to the top
    of the viewport (see .scene-fixed) so it never scrolls away. */
 :root {
-  --scene-h: 120px;
+  --scene-h: 64px;
 }
 
 .scene-fixed {

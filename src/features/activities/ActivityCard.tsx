@@ -5,10 +5,12 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { usePhotosStore } from '../../stores/photosStore'
 import { usePollsStore } from '../../stores/pollsStore'
+import { useDigestStore } from '../../stores/digestStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PhotoGallery } from '../photos/PhotoGallery'
 import { PollSection } from '../polls/PollSection'
+import { ActivityHistory } from './ActivityHistory'
 
 const CreateActivityModal = lazy(() =>
   import('./CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),
@@ -32,6 +34,7 @@ const FALLBACK_AVATAR = resolveAssetUrl('/avatars/starfish.svg')!
 // array on every call (that trips useSyncExternalStore into an infinite
 // re-render loop, since it looks like the snapshot changed every time).
 const EMPTY_PHOTOS: never[] = []
+const EMPTY_HISTORY: never[] = []
 
 function avgRating(activity: Activity): number | null {
   const rated = activity.participants.filter((p) => p.rating != null)
@@ -93,13 +96,16 @@ export function ActivityCard({
   const fetchPhotosForActivity = usePhotosStore((s) => s.fetchForActivity)
   const poll = usePollsStore((s) => s.byActivity[activity.id])
   const fetchPollForActivity = usePollsStore((s) => s.fetchForActivity)
+  const history = useDigestStore((s) => s.byActivity[activity.id] ?? EMPTY_HISTORY)
+  const fetchHistoryForActivity = useDigestStore((s) => s.fetchForActivity)
 
   useEffect(() => {
     if (expanded) {
       void fetchPhotosForActivity(activity.id)
       void fetchPollForActivity(activity.id)
+      void fetchHistoryForActivity(activity.id)
     }
-  }, [expanded, activity.id, fetchPhotosForActivity, fetchPollForActivity])
+  }, [expanded, activity.id, fetchPhotosForActivity, fetchPollForActivity, fetchHistoryForActivity])
 
   useEffect(() => {
     if (highlightId && highlightId === activity.id) {
@@ -215,15 +221,9 @@ export function ActivityCard({
           )}
         </div>
 
-        {scheduleCallout && !activity.proposed_date && (
-          <div
-            className={`mt-2 inline-block rounded-lg px-2 py-1 text-xs font-medium ${
-              earliestProposal ? 'bg-accent/15 text-accent' : 'bg-coral/15 text-coral'
-            }`}
-          >
-            {earliestProposal
-              ? `Using proposed time: ${formatProposedDate(earliestProposal.proposed_date!)} · ${formatTime(earliestProposal.proposed_time)}`
-              : 'Day/time needed'}
+        {scheduleCallout && !activity.proposed_date && !earliestProposal && (
+          <div className="mt-2 inline-block rounded-lg bg-coral/15 px-2 py-1 text-xs font-medium text-coral">
+            Day/time needed
           </div>
         )}
 
@@ -462,6 +462,11 @@ export function ActivityCard({
           <div>
             <p className="mb-1 text-xs font-medium text-text-dim">Photos</p>
             <PhotoGallery activityId={activity.id} photos={photos} />
+          </div>
+
+          <div className="border-t border-line pt-3">
+            <p className="mb-1 text-xs font-medium text-text-dim">History</p>
+            <ActivityHistory entries={history} />
           </div>
         </div>
       )}

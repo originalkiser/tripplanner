@@ -22,8 +22,10 @@ interface DigestState {
   loadingSinceLastVisit: boolean
   dayEntries: ChangeEntry[]
   loadingDay: boolean
+  byActivity: Record<string, ChangeEntry[]>
   fetchSinceLastVisit: (sinceIso: string | null) => Promise<void>
   fetchDay: (date: string) => Promise<void>
+  fetchForActivity: (activityId: string) => Promise<void>
 }
 
 export const useDigestStore = create<DigestState>((set) => ({
@@ -31,6 +33,7 @@ export const useDigestStore = create<DigestState>((set) => ({
   loadingSinceLastVisit: false,
   dayEntries: [],
   loadingDay: false,
+  byActivity: {},
 
   fetchSinceLastVisit: async (sinceIso) => {
     if (!sinceIso) {
@@ -70,5 +73,21 @@ export const useDigestStore = create<DigestState>((set) => ({
       return
     }
     set({ dayEntries: (data ?? []) as unknown as ChangeEntry[], loadingDay: false })
+  },
+
+  fetchForActivity: async (activityId) => {
+    const { data, error } = await supabase
+      .from('activity_changes')
+      .select(SELECT)
+      .eq('activity_id', activityId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error(error)
+      return
+    }
+    set((state) => ({
+      byActivity: { ...state.byActivity, [activityId]: (data ?? []) as unknown as ChangeEntry[] },
+    }))
   },
 }))

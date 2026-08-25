@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
+import { HappeningNowBanner } from '../HappeningNowBanner'
 import { PollStack } from '../../features/polls/PollStack'
 import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
       <HeroScene />
+      <HappeningNowBanner />
       <UpdateBanner />
       <PollStack />
 
