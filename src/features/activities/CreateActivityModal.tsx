@@ -244,8 +244,8 @@ export function CreateActivityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 backdrop-blur-sm sm:items-center sm:justify-center">
-      <div className="flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-surface sm:rounded-2xl">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
+      <div className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface">
         <div className="flex items-center justify-between border-b border-line p-4">
           <h2 className="text-xl font-semibold text-primary">
             {isEdit ? 'Edit Activity' : 'New Activity'}

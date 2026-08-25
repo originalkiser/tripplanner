@@ -6,11 +6,15 @@ import { useAuthStore } from '../../stores/authStore'
 import { usePhotosStore } from '../../stores/photosStore'
 import { usePollsStore } from '../../stores/pollsStore'
 import { useDigestStore } from '../../stores/digestStore'
+import { supabase } from '../../lib/supabase'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PhotoGallery } from '../photos/PhotoGallery'
 import { PollSection } from '../polls/PollSection'
 import { ActivityHistory } from './ActivityHistory'
+import type { Database } from '../../types/database'
+
+type Member = Database['trip']['Tables']['user_profiles']['Row']
 
 const CreateActivityModal = lazy(() =>
   import('./CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),
@@ -82,7 +86,8 @@ export function ActivityCard({
   scheduleCallout?: boolean
 }) {
   const profile = useAuthStore((s) => s.profile)
-  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, adoptProposedTime } = useActivitiesStore()
+  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, adoptProposedTime, inviteParticipants } =
+    useActivitiesStore()
 
   const [expanded, setExpanded] = useState(false)
   const [proposing, setProposing] = useState(false)
@@ -90,6 +95,12 @@ export function ActivityCard({
   const [proposeTime, setProposeTime] = useState('')
   const [busy, setBusy] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
+  const [showInvite, setShowInvite] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+  const [inviteIds, setInviteIds] = useState<Set<string>>(new Set())
+  const [confirmProposal, setConfirmProposal] = useState<{ date: string; time: string; name: string } | null>(
+    null,
+  )
   const cardRef = useRef<HTMLDivElement>(null)
 
   const photos = usePhotosStore((s) => s.byActivity[activity.id] ?? EMPTY_PHOTOS)
@@ -106,6 +117,17 @@ export function ActivityCard({
       void fetchHistoryForActivity(activity.id)
     }
   }, [expanded, activity.id, fetchPhotosForActivity, fetchPollForActivity, fetchHistoryForActivity])
+
+  useEffect(() => {
+    if (showInvite && members.length === 0) {
+      void supabase
+        .from('user_profiles')
+        .select('*')
+        .order('display_name')
+        .then(({ data }) => setMembers(data ?? []))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showInvite])
 
   useEffect(() => {
     if (highlightId && highlightId === activity.id) {
@@ -125,7 +147,36 @@ export function ActivityCard({
       (a, b) =>
         `${a.proposed_date}T${a.proposed_time}`.localeCompare(`${b.proposed_date}T${b.proposed_time}`),
     )[0]
+  // Once a proposal has actually been applied to the activity, showing it
+  // again as a "proposed" badge on the collapsed card is just noise — it's
+  // not a suggestion anymore, it's what's happening. The expanded view
+  // still credits whose proposal it was (see the callout below).
+  const isApplied = (p: (typeof proposedAlts)[number]) =>
+    p.proposed_date === activity.proposed_date && p.proposed_time === activity.proposed_time
+  const unmatchedProposals = proposedAlts.filter((p) => !isApplied(p))
+  const usedProposal = activity.proposed_date ? proposedAlts.find(isApplied) : undefined
   const canEdit = !!profile
+
+  const alreadyParticipating = new Set(activity.participants.map((p) => p.user_id))
+  const inviteCandidates = members.filter((m) => m.id !== profile?.id && !alreadyParticipating.has(m.id))
+
+  function toggleInvite(userId: string) {
+    setInviteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
+  }
+
+  async function sendInvites() {
+    if (inviteIds.size === 0) return
+    setBusy(true)
+    await inviteParticipants(activity.id, [...inviteIds])
+    setBusy(false)
+    setInviteIds(new Set())
+    setShowInvite(false)
+  }
 
   async function handleJoin() {
     if (!profile) return
@@ -241,15 +292,21 @@ export function ActivityCard({
           </div>
         )}
 
-        {proposedAlts.length > 0 && (
+        {unmatchedProposals.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {proposedAlts.map((p) => (
+            {unmatchedProposals.map((p) => (
               <button
                 key={p.user_id}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (p.proposed_date && p.proposed_time) void handleAdoptProposedTime(p.proposed_date, p.proposed_time)
+                  if (p.proposed_date && p.proposed_time) {
+                    setConfirmProposal({
+                      date: p.proposed_date,
+                      time: p.proposed_time,
+                      name: p.profile?.display_name ?? 'Someone',
+                    })
+                  }
                 }}
                 disabled={busy || !p.proposed_date || !p.proposed_time}
                 title="Update to this proposed time"
@@ -298,7 +355,7 @@ export function ActivityCard({
                 : 'bg-bg'
             }`}
           >
-            Propose time
+            {activity.proposed_date ? 'Propose new time' : 'Propose time'}
           </button>
           {mine ? (
             <button
@@ -324,12 +381,63 @@ export function ActivityCard({
 
       {expanded && (
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
+          {showInvite ? (
+            <div className="rounded-lg bg-secondary/10 p-3">
+              <p className="mb-2 text-sm font-medium">Invite others</p>
+              {inviteCandidates.length === 0 ? (
+                <p className="text-xs text-text-dim">Everyone's already in or invited.</p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {inviteCandidates.map((m) => (
+                    <label key={m.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={inviteIds.has(m.id)} onChange={() => toggleInvite(m.id)} />
+                      {m.display_name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex gap-2">
+                {inviteCandidates.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void sendInvites()}
+                    disabled={busy || inviteIds.size === 0}
+                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    Send invites
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowInvite(false)}
+                  className="rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowInvite(true)}
+              className="self-start rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
+            >
+              Invite others
+            </button>
+          )}
+
+          {usedProposal && (
+            <div className="inline-block self-start rounded-lg bg-accent/15 px-2 py-1 text-xs font-medium text-accent">
+              Using {usedProposal.profile?.display_name ?? 'someone'}&rsquo;s proposed time
+            </div>
+          )}
+
           {activity.description && <p className="text-sm">{activity.description}</p>}
 
           {(activity.location_name || activity.link_url) && (
             <div className="text-sm">
               {activity.location_name && <p className="text-text-dim">{activity.location_name}</p>}
-              <div className="mt-1 flex flex-wrap gap-3 text-xs">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {activity.location_lat && activity.location_lng && (
                   <a
                     href={
@@ -339,13 +447,18 @@ export function ActivityCard({
                     }
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary underline"
+                    className="rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
                   >
                     Open in Maps
                   </a>
                 )}
                 {activity.link_url && (
-                  <a href={activity.link_url} target="_blank" rel="noreferrer" className="text-primary underline">
+                  <a
+                    href={activity.link_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
+                  >
                     View link
                   </a>
                 )}
@@ -357,7 +470,7 @@ export function ActivityCard({
             <button
               type="button"
               onClick={() => setShowEdit(true)}
-              className="self-start text-xs text-primary underline"
+              className="self-start rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
             >
               Edit
             </button>
@@ -381,36 +494,6 @@ export function ActivityCard({
                 </li>
               ))}
             </ul>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {!mine && (
-              <button
-                type="button"
-                onClick={() => void handleJoin()}
-                disabled={busy}
-                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                Join
-              </button>
-            )}
-            {mine && (
-              <button
-                type="button"
-                onClick={() => void handleLeave()}
-                disabled={busy}
-                className="rounded-lg bg-secondary/20 px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-              >
-                Leave
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setProposing((v) => !v)}
-              className="rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
-            >
-              Propose different time
-            </button>
           </div>
 
           {proposing && (
@@ -475,6 +558,56 @@ export function ActivityCard({
         <Suspense fallback={null}>
           <CreateActivityModal activity={activity} onClose={() => setShowEdit(false)} />
         </Suspense>
+      )}
+
+      {confirmProposal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setConfirmProposal(null)}
+        >
+          <div
+            className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-start justify-between gap-2">
+              <h3 className="font-heading text-lg font-semibold">Use Proposed Date and Time?</h3>
+              <button
+                type="button"
+                onClick={() => setConfirmProposal(null)}
+                className="text-xl leading-none opacity-60"
+              >
+                &times;
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-text-dim">
+              {confirmProposal.name}&rsquo;s proposal: {formatProposedDate(confirmProposal.date)} ·{' '}
+              {formatTime(confirmProposal.time)}
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={async () => {
+                  await handleAdoptProposedTime(confirmProposal.date, confirmProposal.time)
+                  setConfirmProposal(null)
+                }}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Yes, use this time
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmProposal(null)
+                  openProposeForm()
+                }}
+                className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
+              >
+                Choose different time
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

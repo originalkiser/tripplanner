@@ -3,7 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
 import { HappeningNowBanner } from '../HappeningNowBanner'
-import { PollStack } from '../../features/polls/PollStack'
+import { NotificationStack } from '../NotificationStack'
 import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
@@ -48,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <HeroScene />
       <HappeningNowBanner />
       <UpdateBanner />
-      <PollStack />
+      <NotificationStack />
 
       <main className="relative z-10 flex-1 overflow-y-auto pt-[var(--scene-h)]">
         {children}

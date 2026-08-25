@@ -18,11 +18,11 @@ export function ActivityQuickView({ activityId, onClose }: { activityId: string;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 backdrop-blur-sm sm:items-center sm:justify-center"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-bg sm:rounded-2xl"
+        className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-bg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 justify-end p-2">
@@ -30,7 +30,7 @@ export function ActivityQuickView({ activityId, onClose }: { activityId: string;
             &times;
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 pt-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {activity ? (
             <ActivityCard activity={activity} highlightId={activityId} />
           ) : (

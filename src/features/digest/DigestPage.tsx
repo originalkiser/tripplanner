@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useDigestStore } from '../../stores/digestStore'
 import { ActivityQuickView } from '../activities/ActivityQuickView'
 import { CHANGE_VERB } from './changeLabels'
+import { groupChangeEntries, groupSummary } from './groupChanges'
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -59,25 +60,26 @@ export function DigestPage() {
       )}
 
       <ul className="mt-4 flex flex-col gap-2">
-        {dayEntries.map((e) => {
+        {groupChangeEntries(dayEntries).map((g) => {
+          const { verb, detail } = groupSummary(g)
           return (
-            <li key={e.id} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
-              <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
-              {CHANGE_VERB[e.change_type]}{' '}
-              {e.activity ? (
+            <li key={g.key} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">
+              <span className="font-medium">{g.user?.display_name ?? 'Someone'}</span>{' '}
+              {verb || CHANGE_VERB[g.changeType]}{' '}
+              {g.activity ? (
                 <button
                   type="button"
-                  onClick={() => setQuickViewId(e.activity!.id)}
+                  onClick={() => setQuickViewId(g.activity!.id)}
                   className="font-medium text-primary underline"
                 >
-                  {e.activity.name}
+                  {g.activity.name}
                 </button>
               ) : (
                 <span className="font-medium">an activity</span>
               )}
-              {e.summary_text && <p className="mt-1 text-xs text-text-dim">{e.summary_text}</p>}
+              {detail && <p className="mt-1 text-xs text-text-dim">{detail}</p>}
               <p className="font-data mt-1 text-[11px] text-text-dim">
-                {new Date(e.created_at).toLocaleTimeString(undefined, {
+                {new Date(g.createdAt).toLocaleTimeString(undefined, {
                   hour: 'numeric',
                   minute: '2-digit',
                 })}

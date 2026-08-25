@@ -5,37 +5,40 @@
 // palette in index.css) so it stays in sync with light/dark mode without any
 // JS theme-tracking of its own.
 //
-// preserveAspectRatio="none" (stretch to exactly fill width and height,
-// independently) is deliberate: this banner's container is a fixed CSS
-// height but its width can be anything from a phone to a wide desktop
-// window, and a uniform-scaling "slice"/"meet" fit only covers that whole
-// range acceptably within a narrow band of aspect ratios. On a wide-but-
-// short desktop window, "slice" scales up to cover the width and crops
-// almost everything above the waterline, leaving what looks like a blank
-// strip. Stretching trades a little horizontal distortion (barely visible
-// for a shallow decorative strip like this) for guaranteed full vertical
-// visibility at every width.
+// The sky/water wash and the decorative content (sun, trees, clouds/stars)
+// are deliberately two separate layers with two different fit strategies,
+// because no single strategy works for both across the width range this
+// banner has to cover (a phone up to a wide desktop window, at a fixed CSS
+// height):
+//   - The wash is plain CSS gradients (.scene-bg) that always fill the
+//     container edge-to-edge. A gradient stretching to any width looks
+//     fine — there's no shape to distort.
+//   - The content is one SVG (.scene-content) using
+//     preserveAspectRatio="xMidYMid meet" (contain, centered) — it scales
+//     uniformly and is never cropped or stretched, just shrinks and
+//     centers on very wide windows, with the wash showing on either side.
+//     An earlier version used preserveAspectRatio="none" (stretch) to
+//     guarantee nothing got cropped on wide windows, which did fix that,
+//     but stretched the sun and palm trees into a visibly squashed mess on
+//     a real desktop width. "meet" avoids both failure modes.
 export function HeroScene() {
   return (
     <div className="scene-fixed">
+      <div className="scene-bg scene-day">
+        <div className="scene-sky-day" />
+        <div className="scene-water-day" />
+      </div>
+      <div className="scene-bg scene-night">
+        <div className="scene-sky-night" />
+        <div className="scene-water-night" />
+      </div>
+
       <svg
-        className="scene-day h-full w-full"
+        className="scene-content scene-day"
         viewBox="0 0 420 72"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <defs>
-          <linearGradient id="sky-day" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#fdf1de" />
-            <stop offset="100%" stopColor="#fbdfb0" />
-          </linearGradient>
-          <linearGradient id="water-day" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#7fc8c9" />
-            <stop offset="100%" stopColor="#2d5d7b" />
-          </linearGradient>
-        </defs>
-
-        <rect x="0" y="0" width="420" height="50" fill="url(#sky-day)" />
         <circle className="scene-sun" cx="340" cy="16" r="7" fill="#f6b857" />
 
         <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.8">
@@ -48,32 +51,16 @@ export function HeroScene() {
           <ellipse cx="229" cy="25" rx="7" ry="3.5" />
         </g>
 
-        <rect x="0" y="50" width="420" height="22" fill="url(#water-day)" />
-        <rect x="0" y="48.5" width="420" height="1.5" fill="#fbdfb0" opacity="0.6" />
-
         <Palm x={38} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
         <Palm x={396} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
       </svg>
 
       <svg
-        className="scene-night h-full w-full"
+        className="scene-content scene-night"
         viewBox="0 0 420 72"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <defs>
-          <linearGradient id="sky-night" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#0a1a20" />
-            <stop offset="100%" stopColor="#16323d" />
-          </linearGradient>
-          <linearGradient id="water-night" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#123038" />
-            <stop offset="100%" stopColor="#0a1a20" />
-          </linearGradient>
-        </defs>
-
-        <rect x="0" y="0" width="420" height="50" fill="url(#sky-night)" />
-
         <g fill="#eaf2f3">
           {STAR_POSITIONS.map(([sx, sy, r], i) => (
             <circle
@@ -89,9 +76,6 @@ export function HeroScene() {
 
         <circle className="scene-sun" cx="340" cy="14" r="6" fill="#eaf2f3" />
         <circle cx="337" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
-
-        <rect x="0" y="50" width="420" height="22" fill="url(#water-night)" />
-        <rect x="0" y="48.5" width="420" height="1.5" fill="#234450" opacity="0.8" />
 
         <Palm x={38} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
         <Palm x={396} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />

@@ -10,6 +10,7 @@ export type ChangeType =
   | 'updated'
   | 'joined'
   | 'left'
+  | 'invited'
   | 'proposed_time'
   | 'photo_added'
   | 'comment'

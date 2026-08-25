@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useDigestStore } from '../../stores/digestStore'
 import { CHANGE_GROUP_LABEL, CHANGE_VERB } from './changeLabels'
+import { groupChangeEntries, groupSummary } from './groupChanges'
 import type { ChangeType } from '../../types/database'
 
 export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: string) => void }) {
@@ -16,9 +17,10 @@ export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: stri
 
   if (!previousLastSeenAt || sinceLastVisit.length === 0 || dismissed) return null
 
-  const counts = sinceLastVisit.reduce(
-    (acc, e) => {
-      acc[e.change_type] = (acc[e.change_type] ?? 0) + 1
+  const groups = groupChangeEntries(sinceLastVisit)
+  const counts = groups.reduce(
+    (acc, g) => {
+      acc[g.changeType] = (acc[g.changeType] ?? 0) + 1
       return acc
     },
     {} as Record<ChangeType, number>,
@@ -54,20 +56,22 @@ export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: stri
         </button>
       ) : (
         <ul className="mt-2 flex flex-col gap-1.5 border-t border-white/20 pt-2 text-sm">
-          {sinceLastVisit.map((e) => {
+          {groups.map((g) => {
+            const { verb, detail } = groupSummary(g)
             const content = (
               <>
-                <span className="font-medium">{e.user?.display_name ?? 'Someone'}</span>{' '}
-                {CHANGE_VERB[e.change_type]}{' '}
-                <span className="font-medium">{e.activity?.name ?? 'an activity'}</span>
+                <span className="font-medium">{g.user?.display_name ?? 'Someone'}</span>{' '}
+                {verb || CHANGE_VERB[g.changeType]}{' '}
+                <span className="font-medium">{g.activity?.name ?? 'an activity'}</span>
+                {detail && <span className="opacity-80"> ({detail})</span>}
               </>
             )
             return (
-              <li key={e.id}>
-                {e.activity ? (
+              <li key={g.key}>
+                {g.activity ? (
                   <button
                     type="button"
-                    onClick={() => onSelectActivity(e.activity!.id)}
+                    onClick={() => onSelectActivity(g.activity!.id)}
                     className="text-left underline underline-offset-2"
                   >
                     {content}
