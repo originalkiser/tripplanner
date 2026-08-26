@@ -89,6 +89,23 @@ h4 {
   --scene-h: 64px;
 }
 
+/* Taller on wider screens — a fixed 64px strip left the decorative content
+   (which scales with height, see .scene-content) looking tiny and mostly
+   empty gradient once the window was wide enough that width stopped being
+   the limiting dimension. Everything that reads var(--scene-h) (main's
+   top padding, the sticky header offset, the notification stack position)
+   picks this up automatically. */
+@media (min-width: 640px) {
+  :root {
+    --scene-h: 96px;
+  }
+}
+@media (min-width: 1024px) {
+  :root {
+    --scene-h: 128px;
+  }
+}
+
 .scene-fixed {
   position: fixed;
   inset-inline: 0;
@@ -101,6 +118,12 @@ h4 {
   z-index: 15;
   pointer-events: none;
   overflow: hidden;
+  /* Forces this onto its own compositor layer. Without it, some mobile
+     browsers can let a fast-scrolling sibling repaint a frame ahead of a
+     fixed element, showing scrolled content flash through the strip for
+     an instant before the fixed layer catches up. */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 /* Full-bleed gradient wash — always fills the container exactly, since

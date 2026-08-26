@@ -114,7 +114,7 @@ export function ActivityListPage() {
                       </span>
                     )}
                   </h2>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {dayActivities.map((a) => (
                       <ActivityCard key={a.id} activity={a} haloColor={day.color} highlightId={highlightId} />
                     ))}
@@ -138,7 +138,7 @@ export function ActivityListPage() {
                   Not on the calendar yet, but people are in — propose a time, or click an already
                   proposed one to make it official.
                 </p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {needsScheduling.map((a) => (
                     <ActivityCard key={a.id} activity={a} highlightId={highlightId} scheduleCallout />
                   ))}
