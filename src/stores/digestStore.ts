@@ -7,12 +7,13 @@ export interface ChangeEntry {
   change_type: ChangeType
   summary_text: string | null
   created_at: string
+  user_id: string
   activity: { id: string; name: string; proposed_date: string | null } | null
   user: { display_name: string } | null
 }
 
 const SELECT = `
-  id, change_type, summary_text, created_at,
+  id, change_type, summary_text, created_at, user_id,
   activity:activities(id, name, proposed_date),
   user:user_profiles(display_name)
 `

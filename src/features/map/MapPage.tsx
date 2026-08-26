@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Map as MaplibreMap, Marker, Popup, type GeoJSONSource } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { osmRasterStyle } from '../../lib/mapStyle'
+import { osmRasterStyle, darkRasterStyle } from '../../lib/mapStyle'
 import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
@@ -64,6 +64,7 @@ export function MapPage() {
   const [savingKey, setSavingKey] = useState(false)
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('light')
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
@@ -275,6 +276,20 @@ export function MapPage() {
     setPairSelection([])
   }
 
+  function toggleMapTheme() {
+    const map = mapRef.current
+    if (!map) return
+    const next = mapTheme === 'light' ? 'dark' : 'light'
+    // setStyle() reloads the whole style (sources/layers), which drops the
+    // route line — it's simplest to just clear routing rather than redraw
+    // it after the style finishes loading. Markers aren't part of the
+    // style (they're plain DOM overlays MapLibre repositions on its own),
+    // so they survive the swap untouched.
+    if (routingMode !== 'off') stopRouting()
+    map.setStyle(next === 'dark' ? darkRasterStyle : osmRasterStyle)
+    setMapTheme(next)
+  }
+
   async function saveOrsKey(e: React.FormEvent) {
     e.preventDefault()
     setSavingKey(true)
@@ -329,6 +344,14 @@ export function MapPage() {
             className="rounded-lg bg-bg px-2 py-1.5 text-xs font-medium md:hidden"
           >
             <HamburgerIcon />
+          </button>
+          <button
+            type="button"
+            onClick={toggleMapTheme}
+            aria-label={mapTheme === 'light' ? 'Switch map to dark mode' : 'Switch map to light mode'}
+            className="rounded-lg bg-bg px-2 py-1.5 text-xs font-medium"
+          >
+            {mapTheme === 'light' ? <MoonIcon /> : <SunIcon />}
           </button>
           <button
             type="button"
@@ -522,6 +545,23 @@ function HamburgerIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
       <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />
+    </svg>
+  )
+}
+
+function SunIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
     </svg>
   )
 }

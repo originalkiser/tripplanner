@@ -6,6 +6,7 @@ import { groupChangeEntries, groupSummary } from './groupChanges'
 import type { ChangeType } from '../../types/database'
 
 export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: string) => void }) {
+  const profile = useAuthStore((s) => s.profile)
   const previousLastSeenAt = useAuthStore((s) => s.previousLastSeenAt)
   const { sinceLastVisit, fetchSinceLastVisit } = useDigestStore()
   const [dismissed, setDismissed] = useState(false)
@@ -15,9 +16,13 @@ export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: stri
     if (previousLastSeenAt) void fetchSinceLastVisit(previousLastSeenAt)
   }, [previousLastSeenAt, fetchSinceLastVisit])
 
-  if (!previousLastSeenAt || sinceLastVisit.length === 0 || dismissed) return null
+  // "While you were away" should only surface what other people did — your
+  // own actions aren't news to you.
+  const others = sinceLastVisit.filter((e) => e.user_id !== profile?.id)
 
-  const groups = groupChangeEntries(sinceLastVisit)
+  if (!previousLastSeenAt || others.length === 0 || dismissed) return null
+
+  const groups = groupChangeEntries(others)
   const counts = groups.reduce(
     (acc, g) => {
       acc[g.changeType] = (acc[g.changeType] ?? 0) + 1

@@ -21,6 +21,13 @@
 //     guarantee nothing got cropped on wide windows, which did fix that,
 //     but stretched the sun and palm trees into a visibly squashed mess on
 //     a real desktop width. "meet" avoids both failure modes.
+//   - "meet" still centers a narrower viewBox in a much wider container,
+//     leaving bare gradient on both sides once the window is desktop-wide.
+//     Rather than stretch to close that gap, the viewBox itself was widened
+//     (420 -> 900 units) and populated with two extra palm trees and more
+//     stars/clouds spread across the middle, so there's simply more scene
+//     to show across that width instead of the same handful of elements
+//     stretched or floating in empty space.
 export function HeroScene() {
   return (
     <div className="scene-fixed">
@@ -35,29 +42,35 @@ export function HeroScene() {
 
       <svg
         className="scene-content scene-day"
-        viewBox="0 0 420 72"
+        viewBox="0 0 900 72"
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <circle className="scene-sun" cx="340" cy="16" r="7" fill="#f6b857" />
+        <circle className="scene-sun" cx="729" cy="16" r="7" fill="#f6b857" />
 
         <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.8">
-          <ellipse cx="90" cy="16" rx="13" ry="5" />
-          <ellipse cx="102" cy="14" rx="9" ry="4.5" />
-          <ellipse cx="78" cy="14.5" rx="8" ry="4" />
+          <ellipse cx="193" cy="16" rx="13" ry="5" />
+          <ellipse cx="219" cy="14" rx="9" ry="4.5" />
+          <ellipse cx="167" cy="14.5" rx="8" ry="4" />
         </g>
         <g className="scene-cloud scene-cloud-b" fill="#ffffff" opacity="0.7">
-          <ellipse cx="220" cy="27" rx="10" ry="4" />
-          <ellipse cx="229" cy="25" rx="7" ry="3.5" />
+          <ellipse cx="471" cy="27" rx="10" ry="4" />
+          <ellipse cx="491" cy="25" rx="7" ry="3.5" />
+        </g>
+        <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.65">
+          <ellipse cx="612" cy="19" rx="9" ry="3.5" />
+          <ellipse cx="624" cy="17.5" rx="6" ry="3" />
         </g>
 
-        <Palm x={38} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
-        <Palm x={396} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+        <Palm x={81} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+        <Palm x={330} baseY={50} height={17} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+        <Palm x={590} baseY={50} height={15} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+        <Palm x={849} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
       </svg>
 
       <svg
         className="scene-content scene-night"
-        viewBox="0 0 420 72"
+        viewBox="0 0 900 72"
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
@@ -74,27 +87,40 @@ export function HeroScene() {
           ))}
         </g>
 
-        <circle className="scene-sun" cx="340" cy="14" r="6" fill="#eaf2f3" />
-        <circle cx="337" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
+        <circle className="scene-sun" cx="729" cy="14" r="6" fill="#eaf2f3" />
+        <circle cx="726" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
 
-        <Palm x={38} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
-        <Palm x={396} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+        <Palm x={81} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+        <Palm x={330} baseY={50} height={17} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+        <Palm x={590} baseY={50} height={15} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+        <Palm x={849} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
       </svg>
     </div>
   )
 }
 
+// Spread across the full 900-unit-wide viewBox (see the width note above) so
+// the night sky reads as full of stars edge-to-edge rather than clustered
+// where the old, narrower viewBox used to end.
 const STAR_POSITIONS: Array<[number, number, number]> = [
-  [70, 9, 1],
-  [140, 16, 0.8],
-  [220, 7, 1.1],
-  [270, 19, 0.8],
-  [25, 22, 0.9],
-  [180, 24, 0.8],
-  [305, 10, 0.9],
-  [45, 8, 0.7],
-  [250, 33, 0.7],
-  [155, 30, 0.9],
+  [150, 9, 1],
+  [300, 16, 0.8],
+  [471, 7, 1.1],
+  [578, 19, 0.8],
+  [54, 22, 0.9],
+  [386, 24, 0.8],
+  [654, 10, 0.9],
+  [96, 8, 0.7],
+  [536, 33, 0.7],
+  [332, 30, 0.9],
+  [720, 12, 0.8],
+  [800, 20, 0.9],
+  [30, 15, 0.7],
+  [410, 10, 0.8],
+  [500, 25, 0.7],
+  [660, 28, 0.8],
+  [870, 9, 0.7],
+  [250, 12, 0.8],
 ]
 
 interface PalmProps {

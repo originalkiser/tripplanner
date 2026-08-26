@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useAuthStore } from '../../stores/authStore'
 import { useDigestStore } from '../../stores/digestStore'
 import { ActivityQuickView } from '../activities/ActivityQuickView'
 import { CHANGE_VERB } from './changeLabels'
@@ -23,6 +24,7 @@ function formatDay(date: string): string {
 }
 
 export function DigestPage() {
+  const profile = useAuthStore((s) => s.profile)
   const [date, setDate] = useState(todayIso())
   const [quickViewId, setQuickViewId] = useState<string | null>(null)
   const { dayEntries, loadingDay, fetchDay } = useDigestStore()
@@ -30,6 +32,10 @@ export function DigestPage() {
   useEffect(() => {
     void fetchDay(date)
   }, [date, fetchDay])
+
+  // Your own actions aren't news to you — this is meant to show what
+  // everyone *else* on the trip has been up to.
+  const others = dayEntries.filter((e) => e.user_id !== profile?.id)
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
@@ -55,12 +61,12 @@ export function DigestPage() {
 
       {loadingDay && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
 
-      {!loadingDay && dayEntries.length === 0 && (
+      {!loadingDay && others.length === 0 && (
         <p className="mt-8 text-center text-sm text-text-dim">Nothing happened this day.</p>
       )}
 
       <ul className="mt-4 flex flex-col gap-2">
-        {groupChangeEntries(dayEntries).map((g) => {
+        {groupChangeEntries(others).map((g) => {
           const { verb, detail } = groupSummary(g)
           return (
             <li key={g.key} className="card-shadow rounded-xl border border-line bg-surface p-3 text-sm">

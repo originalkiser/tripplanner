@@ -50,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <UpdateBanner />
       <NotificationStack />
 
-      <main className="relative z-10 flex-1 overflow-y-auto pt-[var(--scene-h)]">
+      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain pt-[var(--scene-h)]">
         {children}
       </main>
 
