@@ -86,20 +86,17 @@ h4 {
    clouds, a twinkling night sky, and a glowing sun or moon. Fixed to the top
    of the viewport (see .scene-fixed) so it never scrolls away. */
 :root {
-  --scene-h: 64px;
+  --scene-h: 96px;
 }
 
-/* Taller on wider screens — a fixed 64px strip left the decorative content
-   (which scales with height, see .scene-content) looking tiny and mostly
-   empty gradient once the window was wide enough that width stopped being
-   the limiting dimension. Everything that reads var(--scene-h) (main's
-   top padding, the sticky header offset, the notification stack position)
-   picks this up automatically. */
-@media (min-width: 640px) {
-  :root {
-    --scene-h: 96px;
-  }
-}
+/* Taller on wide screens — same breakpoint the content SVG swaps to its
+   wider desktop layout at (see .scene-content-desktop below), so the extra
+   height and the extra width show up together. Mobile no longer gets a
+   shorter strip than tablet: an earlier smaller mobile tier made the scene
+   (and everything scaled to fit it) look "very very small" on phones.
+   Everything that reads var(--scene-h) (main's top padding, the sticky
+   header offset, the notification stack position) picks this up
+   automatically. */
 @media (min-width: 1024px) {
   :root {
     --scene-h: 128px;
@@ -167,6 +164,26 @@ h4 {
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+/* Two content SVGs (see HeroScene.tsx) swapped by width, not theme — a
+   tighter mobile layout and a wider desktop one, so "meet" scaling is
+   fitting each to a viewBox proportioned for its own width instead of
+   shrinking the wide desktop layout down for a phone. Same breakpoint
+   --scene-h grows at, above. */
+.scene-content-desktop {
+  display: none;
+}
+.scene-content-mobile {
+  display: block;
+}
+@media (min-width: 1024px) {
+  .scene-content-desktop {
+    display: block;
+  }
+  .scene-content-mobile {
+    display: none;
+  }
 }
 
 .scene-sun {
@@ -271,30 +288,48 @@ h4 {
   }
 }
 
-.scene-day {
-  display: block;
-}
-.scene-night {
+/* .scene-bg needs `display: flex` to show (its sky/water children are laid
+   out with flex-basis percentages) while the content group (.scene-
+   visibility, an inner <g> — see HeroScene.tsx) just needs `display: block`
+   — a single shared `.scene-day { display: block }` rule stomped the flex
+   layout on `.scene-bg.scene-day`/`.scene-night` (same specificity, later in
+   the cascade), collapsing the sky/water gradient bands to ~0px tall. That
+   silently killed both the horizon wash AND the hero's opacity as a mask
+   over scrolled content — the strip was rendering almost fully transparent,
+   which is what let scrolled cards bleed through it. Targeting each element
+   type by its own combined class keeps the specificity high enough to win
+   regardless of source order, and restates the correct "shown" display per
+   element instead of a one-size-fits-all block. */
+.scene-visibility.scene-night,
+.scene-bg.scene-night {
   display: none;
 }
 
 :root:not([data-theme='light']) {
   @media (prefers-color-scheme: dark) {
-    .scene-day {
+    .scene-visibility.scene-day,
+    .scene-bg.scene-day {
       display: none;
     }
-    .scene-night {
+    .scene-visibility.scene-night {
       display: block;
+    }
+    .scene-bg.scene-night {
+      display: flex;
     }
   }
 }
 
 :root[data-theme='dark'] {
-  .scene-day {
+  .scene-visibility.scene-day,
+  .scene-bg.scene-day {
     display: none;
   }
-  .scene-night {
+  .scene-visibility.scene-night {
     display: block;
+  }
+  .scene-bg.scene-night {
+    display: flex;
   }
 }
 

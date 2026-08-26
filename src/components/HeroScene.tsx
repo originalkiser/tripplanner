@@ -13,21 +13,35 @@
 //   - The wash is plain CSS gradients (.scene-bg) that always fill the
 //     container edge-to-edge. A gradient stretching to any width looks
 //     fine — there's no shape to distort.
-//   - The content is one SVG (.scene-content) using
-//     preserveAspectRatio="xMidYMid meet" (contain, centered) — it scales
-//     uniformly and is never cropped or stretched, just shrinks and
-//     centers on very wide windows, with the wash showing on either side.
+//   - The content is SVG using preserveAspectRatio="xMidYMid meet" (contain,
+//     centered) — it scales uniformly and is never cropped or stretched.
 //     An earlier version used preserveAspectRatio="none" (stretch) to
 //     guarantee nothing got cropped on wide windows, which did fix that,
 //     but stretched the sun and palm trees into a visibly squashed mess on
 //     a real desktop width. "meet" avoids both failure modes.
-//   - "meet" still centers a narrower viewBox in a much wider container,
-//     leaving bare gradient on both sides once the window is desktop-wide.
-//     Rather than stretch to close that gap, the viewBox itself was widened
-//     (420 -> 900 units) and populated with two extra palm trees and more
-//     stars/clouds spread across the middle, so there's simply more scene
-//     to show across that width instead of the same handful of elements
-//     stretched or floating in empty space.
+//   - A single viewBox can't look right at both ends of that width range: a
+//     narrow one leaves a wide desktop window mostly bare gradient either
+//     side (nothing to stretch, but nothing to fill the space either), and
+//     a wide one shrinks every element down to fit a narrow phone width
+//     (the scaling that makes "meet" avoid stretching also makes content
+//     tiny once the container is much narrower than the viewBox). Rather
+//     than pick one bad tradeoff, there are two content SVGs — a wider one
+//     (more palms, more sky) for desktop and a tighter one (matching the
+//     original 2-palm layout) for mobile — swapped by a plain CSS media
+//     query (.scene-content-mobile / .scene-content-desktop) at the same
+//     breakpoint --scene-h grows at, so mobile gets a scene sized for its
+//     own width instead of a shrunk-down slice of the desktop one.
+//
+// The day/night swap lives on an inner <g class="scene-visibility"> per
+// theme rather than on the <svg> itself, so it can use plain `display:
+// block/none` — the outer <svg> only needs display toggled by breakpoint
+// (.scene-content-mobile/-desktop). .scene-bg (the gradient wash) needs its
+// *own* combined-class day/night rule in index.css, because it's a flex
+// container (sky/water flex-basis) and a shared single-class display rule
+// there would stomp `display: flex` with `display: block` — that exact bug
+// once silently collapsed the sky/water gradient bands to ~0px tall, which
+// also meant the "fixed" scene wasn't opaque enough to mask scrolled
+// content underneath it.
 export function HeroScene() {
   return (
     <div className="scene-fixed">
@@ -41,68 +55,122 @@ export function HeroScene() {
       </div>
 
       <svg
-        className="scene-content scene-day"
+        className="scene-content scene-content-desktop"
         viewBox="0 0 900 72"
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <circle className="scene-sun" cx="729" cy="16" r="7" fill="#f6b857" />
+        <g className="scene-visibility scene-day">
+          <circle className="scene-sun" cx="729" cy="16" r="7" fill="#f6b857" />
 
-        <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.8">
-          <ellipse cx="193" cy="16" rx="13" ry="5" />
-          <ellipse cx="219" cy="14" rx="9" ry="4.5" />
-          <ellipse cx="167" cy="14.5" rx="8" ry="4" />
-        </g>
-        <g className="scene-cloud scene-cloud-b" fill="#ffffff" opacity="0.7">
-          <ellipse cx="471" cy="27" rx="10" ry="4" />
-          <ellipse cx="491" cy="25" rx="7" ry="3.5" />
-        </g>
-        <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.65">
-          <ellipse cx="612" cy="19" rx="9" ry="3.5" />
-          <ellipse cx="624" cy="17.5" rx="6" ry="3" />
+          <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.8">
+            <ellipse cx="193" cy="16" rx="13" ry="5" />
+            <ellipse cx="219" cy="14" rx="9" ry="4.5" />
+            <ellipse cx="167" cy="14.5" rx="8" ry="4" />
+          </g>
+          <g className="scene-cloud scene-cloud-b" fill="#ffffff" opacity="0.7">
+            <ellipse cx="471" cy="27" rx="10" ry="4" />
+            <ellipse cx="491" cy="25" rx="7" ry="3.5" />
+          </g>
+          <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.65">
+            <ellipse cx="612" cy="19" rx="9" ry="3.5" />
+            <ellipse cx="624" cy="17.5" rx="6" ry="3" />
+          </g>
+
+          <Palm x={81} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+          <Palm x={330} baseY={50} height={17} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+          <Palm x={590} baseY={50} height={15} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+          <Palm x={849} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
         </g>
 
-        <Palm x={81} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
-        <Palm x={330} baseY={50} height={17} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
-        <Palm x={590} baseY={50} height={15} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
-        <Palm x={849} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+        <g className="scene-visibility scene-night">
+          <g fill="#eaf2f3">
+            {STAR_POSITIONS_DESKTOP.map(([sx, sy, r], i) => (
+              <circle
+                key={i}
+                className="scene-star"
+                cx={sx}
+                cy={sy}
+                r={r}
+                style={{ animationDelay: `${(i * 0.7) % 4}s`, animationDuration: `${3 + (i % 4)}s` }}
+              />
+            ))}
+          </g>
+
+          <circle className="scene-sun" cx="729" cy="14" r="6" fill="#eaf2f3" />
+          <circle cx="726" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
+
+          <Palm x={81} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+          <Palm x={330} baseY={50} height={17} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+          <Palm x={590} baseY={50} height={15} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+          <Palm x={849} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+        </g>
       </svg>
 
       <svg
-        className="scene-content scene-night"
-        viewBox="0 0 900 72"
+        className="scene-content scene-content-mobile"
+        viewBox="0 0 420 72"
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <g fill="#eaf2f3">
-          {STAR_POSITIONS.map(([sx, sy, r], i) => (
-            <circle
-              key={i}
-              className="scene-star"
-              cx={sx}
-              cy={sy}
-              r={r}
-              style={{ animationDelay: `${(i * 0.7) % 4}s`, animationDuration: `${3 + (i % 4)}s` }}
-            />
-          ))}
+        <g className="scene-visibility scene-day">
+          <circle className="scene-sun" cx="340" cy="16" r="7" fill="#f6b857" />
+
+          <g className="scene-cloud scene-cloud-a" fill="#ffffff" opacity="0.8">
+            <ellipse cx="90" cy="16" rx="13" ry="5" />
+            <ellipse cx="102" cy="14" rx="9" ry="4.5" />
+            <ellipse cx="78" cy="14.5" rx="8" ry="4" />
+          </g>
+          <g className="scene-cloud scene-cloud-b" fill="#ffffff" opacity="0.7">
+            <ellipse cx="220" cy="27" rx="10" ry="4" />
+            <ellipse cx="229" cy="25" rx="7" ry="3.5" />
+          </g>
+
+          <Palm x={38} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+          <Palm x={396} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
         </g>
 
-        <circle className="scene-sun" cx="729" cy="14" r="6" fill="#eaf2f3" />
-        <circle cx="726" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
+        <g className="scene-visibility scene-night">
+          <g fill="#eaf2f3">
+            {STAR_POSITIONS_MOBILE.map(([sx, sy, r], i) => (
+              <circle
+                key={i}
+                className="scene-star"
+                cx={sx}
+                cy={sy}
+                r={r}
+                style={{ animationDelay: `${(i * 0.7) % 4}s`, animationDuration: `${3 + (i % 4)}s` }}
+              />
+            ))}
+          </g>
 
-        <Palm x={81} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
-        <Palm x={330} baseY={50} height={17} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
-        <Palm x={590} baseY={50} height={15} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
-        <Palm x={849} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+          <circle className="scene-sun" cx="340" cy="14" r="6" fill="#eaf2f3" />
+          <circle cx="337" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
+
+          <Palm x={38} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+          <Palm x={396} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+        </g>
       </svg>
     </div>
   )
 }
 
-// Spread across the full 900-unit-wide viewBox (see the width note above) so
-// the night sky reads as full of stars edge-to-edge rather than clustered
-// where the old, narrower viewBox used to end.
-const STAR_POSITIONS: Array<[number, number, number]> = [
+const STAR_POSITIONS_MOBILE: Array<[number, number, number]> = [
+  [70, 9, 1],
+  [140, 16, 0.8],
+  [220, 7, 1.1],
+  [270, 19, 0.8],
+  [25, 22, 0.9],
+  [180, 24, 0.8],
+  [305, 10, 0.9],
+  [45, 8, 0.7],
+  [250, 33, 0.7],
+  [155, 30, 0.9],
+]
+
+// Spread across the wider 900-unit desktop viewBox so the night sky reads as
+// full of stars edge-to-edge rather than clustered in the middle.
+const STAR_POSITIONS_DESKTOP: Array<[number, number, number]> = [
   [150, 9, 1],
   [300, 16, 0.8],
   [471, 7, 1.1],
