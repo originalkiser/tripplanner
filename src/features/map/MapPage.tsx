@@ -20,6 +20,31 @@ const TYPE_ICON: Record<string, string> = {
   food_and_activity: '★',
 }
 
+type FilterKey = 'planned' | 'unplanned' | 'joined' | 'others_joined'
+
+const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
+  { key: 'planned', label: 'Planned' },
+  { key: 'unplanned', label: 'Unplanned' },
+  { key: 'joined', label: "I've joined" },
+  { key: 'others_joined', label: 'Others joined' },
+]
+
+// A located activity is shown if it matches ANY checked category — the four
+// categories overlap (a planned stop can also be one you've joined), so this
+// is an inclusive OR across whichever boxes are checked, not an AND filter
+// narrowing down a single dimension.
+function matchesMapFilters(activity: Activity, filters: Set<FilterKey>, userId: string | undefined): boolean {
+  const isPlanned = activity.proposed_date != null
+  const isJoinedByMe = userId != null && activity.participants.some((p) => p.user_id === userId && p.status === 'joined')
+  const isJoinedByOthers = activity.participants.some((p) => p.user_id !== userId && p.status === 'joined')
+  return (
+    (filters.has('planned') && isPlanned) ||
+    (filters.has('unplanned') && !isPlanned) ||
+    (filters.has('joined') && isJoinedByMe) ||
+    (filters.has('others_joined') && isJoinedByOthers)
+  )
+}
+
 // The fill still carries category (Savannah/Tybee); the ring is the same
 // per-day color used for the halo border on Planned page cards, so pins
 // for the same day are recognizable across both views at a glance.
@@ -65,6 +90,10 @@ export function MapPage() {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('light')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [mapFilters, setMapFilters] = useState<Set<FilterKey>>(
+    () => new Set<FilterKey>(['planned', 'unplanned', 'joined', 'others_joined']),
+  )
   const [searchParams] = useSearchParams()
 
   useEffect(() => {
@@ -85,7 +114,8 @@ export function MapPage() {
     }
   }, [])
 
-  const located = activities.filter((a) => a.location_lat != null && a.location_lng != null)
+  const allLocated = activities.filter((a) => a.location_lat != null && a.location_lng != null)
+  const located = allLocated.filter((a) => matchesMapFilters(a, mapFilters, profile?.id))
 
   useEffect(() => {
     const map = mapRef.current
@@ -126,7 +156,7 @@ export function MapPage() {
       // single point or degenerate bounds — ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [located.length, routingMode])
+  }, [located.length, routingMode, mapFilters])
 
   // Deep-link support: `?activity=<id>` (from a card's "View on map" link)
   // selects and centers on that activity once its marker exists.
@@ -290,6 +320,15 @@ export function MapPage() {
     setMapTheme(next)
   }
 
+  function toggleMapFilter(key: FilterKey) {
+    setMapFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
   async function saveOrsKey(e: React.FormEvent) {
     e.preventDefault()
     setSavingKey(true)
@@ -355,6 +394,14 @@ export function MapPage() {
           </button>
           <button
             type="button"
+            onClick={() => setFilterOpen((v) => !v)}
+            aria-label="Filter locations"
+            className={`rounded-lg px-2 py-1.5 text-xs font-medium ${filterOpen ? 'bg-primary text-white' : 'bg-bg'}`}
+          >
+            <FilterIcon />
+          </button>
+          <button
+            type="button"
             onClick={() => toggleRoutingMode('pair')}
             className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${
               routingMode === 'pair' ? 'bg-primary text-white' : 'bg-bg'
@@ -363,6 +410,22 @@ export function MapPage() {
             Route between 2 pins
           </button>
         </div>
+
+        {filterOpen && (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-xl bg-surface p-2 shadow-md">
+            {FILTER_OPTIONS.map((opt) => (
+              <label key={opt.key} className="flex items-center gap-1.5 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={mapFilters.has(opt.key)}
+                  onChange={() => toggleMapFilter(opt.key)}
+                  className="h-3.5 w-3.5 accent-primary"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        )}
 
         {routingMode === 'day' && (
           <div className="flex flex-col gap-2 rounded-xl bg-surface p-2 shadow-md">
@@ -493,7 +556,7 @@ export function MapPage() {
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-40 w-72 transform border-l border-line bg-surface shadow-xl transition-transform duration-200 md:relative md:z-0 md:translate-x-0 md:shadow-none ${
+        className={`fixed top-[var(--scene-h)] bottom-0 right-0 z-40 w-72 transform border-l border-line bg-surface shadow-xl transition-transform duration-200 md:relative md:top-0 md:bottom-0 md:z-0 md:translate-x-0 md:shadow-none ${
           sidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -503,9 +566,11 @@ export function MapPage() {
             &times;
           </button>
         </div>
-        <div className="h-[calc(100svh-64px)] overflow-y-auto p-2">
+        <div className="h-[calc(100svh-var(--scene-h)-64px)] overflow-y-auto p-2">
           {locatedGroups.length === 0 && (
-            <p className="p-3 text-xs text-text-dim">No located items yet.</p>
+            <p className="p-3 text-xs text-text-dim">
+              {allLocated.length === 0 ? 'No located items yet.' : 'No locations match this filter.'}
+            </p>
           )}
           {locatedGroups.map((group) => (
             <div key={group.key} className="mb-3">
@@ -562,6 +627,14 @@ function SunIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
       <circle cx="12" cy="12" r="4" />
       <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+    </svg>
+  )
+}
+
+function FilterIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5h16l-6 7.5V19l-4 2v-8.5Z" />
     </svg>
   )
 }

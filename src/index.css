@@ -166,23 +166,49 @@ h4 {
   height: 100%;
 }
 
-/* Two content SVGs (see HeroScene.tsx) swapped by width, not theme — a
-   tighter mobile layout and a wider desktop one, so "meet" scaling is
-   fitting each to a viewBox proportioned for its own width instead of
-   shrinking the wide desktop layout down for a phone. Same breakpoint
+/* Three content SVGs (see HeroScene.tsx) swapped by width, not theme, each
+   with its own viewBox aspect ratio chosen to be narrower than the
+   *narrowest* container aspect ratio it'll ever be shown at within its
+   width range. That guarantees "meet" always scales by height alone
+   (containerAspect >= viewBoxAspect => the height ratio is always the
+   smaller, constraining one) — the rendered content's height exactly fills
+   the strip with zero vertical letterboxing, so the horizon inside the SVG
+   (a fixed fraction of its viewBox height) always lands exactly on the
+   .scene-bg gradient's horizon (a fixed percentage of the strip height)
+   below. Only *horizontal* letterboxing varies, which just changes how
+   much gradient shows beside the trees — harmless.
+     Two viewBoxes used to cover this (a mobile one and a "desktop" one
+   reused all the way from 1024px to a 4K monitor) — but the desktop
+   viewBox's aspect ratio (12.5, tuned to look spread-out on a genuinely
+   wide window) is *wider* than a 1024–1599px window's own aspect ratio
+   (8–12.49), which is exactly the "vertical letterbox" failure mode above:
+   on that whole range the scene shrank to fit the leftover width, floating
+   above the horizon with a gap and looking tiny. A third "medium" tier
+   (1024–1599px, viewBox aspect exactly 8 — safe down to the 1024px lower
+   bound) closes that gap; the wide tier now only takes over at 1600px,
+   where its own aspect ratio (12.5) first becomes safe. Same breakpoints
    --scene-h grows at, above. */
-.scene-content-desktop {
+.scene-content-medium,
+.scene-content-wide {
   display: none;
 }
 .scene-content-mobile {
   display: block;
 }
 @media (min-width: 1024px) {
-  .scene-content-desktop {
-    display: block;
-  }
   .scene-content-mobile {
     display: none;
+  }
+  .scene-content-medium {
+    display: block;
+  }
+}
+@media (min-width: 1600px) {
+  .scene-content-medium {
+    display: none;
+  }
+  .scene-content-wide {
+    display: block;
   }
 }
 
