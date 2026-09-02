@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Map as MaplibreMap, Marker, Popup, type GeoJSONSource } from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import { osmRasterStyle, darkRasterStyle } from '../../lib/mapStyle'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { OSM_TILE_URL, OSM_ATTRIBUTION } from '../../lib/mapStyle'
 import { useActivitiesStore, type Activity } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { googleMapsUrl, appleMapsUrl, isIOS } from '../../lib/geo'
@@ -48,30 +48,24 @@ function matchesMapFilters(activity: Activity, filters: Set<FilterKey>, userId: 
 // The fill still carries category (Savannah/Tybee); the ring is the same
 // per-day color used for the halo border on Planned page cards, so pins
 // for the same day are recognizable across both views at a glance.
-function markerEl(activity: Activity): HTMLDivElement {
-  const el = document.createElement('div')
-  el.style.width = '30px'
-  el.style.height = '30px'
-  el.style.borderRadius = '50%'
-  el.style.background = CATEGORY_COLOR[activity.category] ?? '#666'
-  el.style.border = `3px solid ${dayColor(activity.proposed_date) ?? '#999'}`
-  el.style.boxShadow = '0 0 0 1.5px white, 0 1px 3px rgba(0,0,0,0.4)'
-  el.style.display = 'flex'
-  el.style.alignItems = 'center'
-  el.style.justifyContent = 'center'
-  el.style.fontSize = '14px'
-  el.style.cursor = 'pointer'
-  el.textContent = TYPE_ICON[activity.type] ?? '📍'
-  return el
+function markerIcon(activity: Activity): L.DivIcon {
+  const fill = CATEGORY_COLOR[activity.category] ?? '#666'
+  const ring = dayColor(activity.proposed_date) ?? '#999'
+  const icon = TYPE_ICON[activity.type] ?? '📍'
+  const html = `<div style="width:30px;height:30px;border-radius:50%;background:${fill};border:3px solid ${ring};box-shadow:0 0 0 1.5px white, 0 1px 3px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;">${icon}</div>`
+  // className: '' drops Leaflet's default .leaflet-div-icon box/border —
+  // the marker above already draws its own circle.
+  return L.divIcon({ html, className: '', iconSize: [30, 30], iconAnchor: [15, 15] })
 }
 
 export function MapPage() {
   const profile = useAuthStore((s) => s.profile)
   const { activities, fetchActivities } = useActivitiesStore()
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<MaplibreMap | null>(null)
-  const markersRef = useRef<Marker[]>([])
-  const markersByIdRef = useRef<Map<string, Marker>>(new Map())
+  const mapRef = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.Marker[]>([])
+  const markersByIdRef = useRef<Map<string, L.Marker>>(new Map())
+  const routeLayerRef = useRef<L.Polyline | null>(null)
   const deepLinkHandledRef = useRef(false)
   const initialActivityIdRef = useRef<string | null>(new URLSearchParams(window.location.search).get('activity'))
 
@@ -102,12 +96,9 @@ export function MapPage() {
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    mapRef.current = new MaplibreMap({
-      container: containerRef.current,
-      style: osmRasterStyle,
-      center: [-81.05, 32.0],
-      zoom: 11,
-    })
+    const map = L.map(containerRef.current, { center: [32.0, -81.05], zoom: 11 })
+    L.tileLayer(OSM_TILE_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map)
+    mapRef.current = map
     return () => {
       mapRef.current?.remove()
       mapRef.current = null
@@ -127,20 +118,13 @@ export function MapPage() {
 
     if (located.length === 0) return
 
-    const bounds: [[number, number], [number, number]] = [
-      [Math.min(...located.map((a) => a.location_lng!)), Math.min(...located.map((a) => a.location_lat!))],
-      [Math.max(...located.map((a) => a.location_lng!)), Math.max(...located.map((a) => a.location_lat!))],
-    ]
+    const bounds: [number, number][] = located.map((a) => [a.location_lat!, a.location_lng!])
 
     for (const activity of located) {
-      const el = markerEl(activity)
-      el.addEventListener('click', () => onMarkerClick(activity))
-
-      const popup = new Popup({ offset: 20 }).setHTML(popupHtml(activity))
-      const marker = new Marker({ element: el })
-        .setLngLat([activity.location_lng!, activity.location_lat!])
-        .setPopup(popup)
+      const marker = L.marker([activity.location_lat!, activity.location_lng!], { icon: markerIcon(activity) })
+        .bindPopup(popupHtml(activity))
         .addTo(map)
+      marker.on('click', () => onMarkerClick(activity))
       markersRef.current.push(marker)
       markersByIdRef.current.set(activity.id, marker)
     }
@@ -151,7 +135,7 @@ export function MapPage() {
     if (initialActivityIdRef.current && !deepLinkHandledRef.current) return
 
     try {
-      map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 })
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 14, animate: false })
     } catch {
       // single point or degenerate bounds — ignore
     }
@@ -177,10 +161,9 @@ export function MapPage() {
     const map = mapRef.current
     const marker = markersByIdRef.current.get(activity.id)
     if (map && activity.location_lat != null && activity.location_lng != null) {
-      map.flyTo({ center: [activity.location_lng, activity.location_lat], zoom: 15, duration: 600 })
+      map.flyTo([activity.location_lat, activity.location_lng], 15, { duration: 0.6 })
     }
-    const popup = marker?.getPopup()
-    if (marker && popup && !popup.isOpen()) marker.togglePopup()
+    if (marker && !marker.isPopupOpen()) marker.openPopup()
   }
 
   function popupHtml(activity: Activity): string {
@@ -263,29 +246,18 @@ export function MapPage() {
   function drawRouteLayer(coords: [number, number][]) {
     const map = mapRef.current
     if (!map) return
-    const geojson = {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: { type: 'LineString' as const, coordinates: coords },
-    }
-    if (map.getSource('route')) {
-      ;(map.getSource('route') as GeoJSONSource).setData(geojson)
+    // The route function returns GeoJSON [lng, lat] pairs; Leaflet wants [lat, lng].
+    const latLngs: [number, number][] = coords.map(([lng, lat]) => [lat, lng])
+    if (routeLayerRef.current) {
+      routeLayerRef.current.setLatLngs(latLngs)
     } else {
-      map.addSource('route', { type: 'geojson', data: geojson })
-      map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        paint: { 'line-color': '#E8A96B', 'line-width': 4 },
-      })
+      routeLayerRef.current = L.polyline(latLngs, { color: '#E8A96B', weight: 4 }).addTo(map)
     }
   }
 
   function clearRouteLayer() {
-    const map = mapRef.current
-    if (!map) return
-    if (map.getLayer('route-line')) map.removeLayer('route-line')
-    if (map.getSource('route')) map.removeSource('route')
+    routeLayerRef.current?.remove()
+    routeLayerRef.current = null
   }
 
   function stopRouting() {
@@ -307,16 +279,12 @@ export function MapPage() {
   }
 
   function toggleMapTheme() {
-    const map = mapRef.current
-    if (!map) return
+    // Dark mode is just a CSS filter on the tile pane (see .leaflet-dark in
+    // index.css) — there's no style/source reload involved, so routing and
+    // markers are untouched by this, unlike the old MapLibre style-swap
+    // approach which had to clear the route line first.
     const next = mapTheme === 'light' ? 'dark' : 'light'
-    // setStyle() reloads the whole style (sources/layers), which drops the
-    // route line — it's simplest to just clear routing rather than redraw
-    // it after the style finishes loading. Markers aren't part of the
-    // style (they're plain DOM overlays MapLibre repositions on its own),
-    // so they survive the swap untouched.
-    if (routingMode !== 'off') stopRouting()
-    map.setStyle(next === 'dark' ? darkRasterStyle : osmRasterStyle)
+    containerRef.current?.classList.toggle('leaflet-dark', next === 'dark')
     setMapTheme(next)
   }
 

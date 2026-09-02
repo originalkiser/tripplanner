@@ -8,7 +8,7 @@ import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 
-// Pulls in MapLibre (for the location-confirm preview) — keep it out of the
+// Pulls in Leaflet (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
 const CreateActivityModal = lazy(() =>
   import('../../features/activities/CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),

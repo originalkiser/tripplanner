@@ -12,8 +12,8 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
 import { SunLoader } from './components/SunLoader'
 
-// MapLibre GL is the single heaviest dependency — keep it out of the main
-// bundle so first load (List/Profile on a phone) stays fast.
+// Leaflet is the map dependency — keep it out of the main bundle so first
+// load (List/Profile on a phone) stays fast.
 const MapPage = lazy(() => import('./features/map/MapPage').then((m) => ({ default: m.MapPage })))
 
 function App() {

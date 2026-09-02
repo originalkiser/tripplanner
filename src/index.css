@@ -369,3 +369,17 @@ h4 {
     animation: none !important;
   }
 }
+
+/* Leaflet dark mode — there's still only the one free OSM raster tile
+   source (no API key, no second dark-tile provider to depend on); dark
+   mode is just a CSS filter inverting that same tile layer's own pane.
+   Scoped to `.leaflet-tile-pane` specifically, not the whole map
+   container, so it doesn't touch the marker/popup/route-line panes —
+   those already carry deliberate colors (per-category fill, per-day ring)
+   that would look wrong inverted along with the map underneath them. */
+.leaflet-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+}
+.leaflet-dark {
+  background: #1a2327;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { Map as MaplibreMap, Marker } from 'maplibre-gl'
-import 'maplibre-gl/dist/maplibre-gl.css'
-import { osmRasterStyle } from '../lib/mapStyle'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import { OSM_TILE_URL, OSM_ATTRIBUTION } from '../lib/mapStyle'
 
 interface MiniMapProps {
   lat: number
@@ -11,22 +11,27 @@ interface MiniMapProps {
 
 export function MiniMap({ lat, lng, className }: MiniMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<MaplibreMap | null>(null)
-  const markerRef = useRef<Marker | null>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const markerRef = useRef<L.Marker | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return
 
-    const map = new MaplibreMap({
-      container: containerRef.current,
-      style: osmRasterStyle,
-      center: [lng, lat],
+    const map = L.map(containerRef.current, {
+      center: [lat, lng],
       zoom: 14,
-      interactive: false,
+      zoomControl: false,
       attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      touchZoom: false,
     })
+    L.tileLayer(OSM_TILE_URL, { attribution: OSM_ATTRIBUTION, maxZoom: 19 }).addTo(map)
     mapRef.current = map
-    markerRef.current = new Marker({ color: '#1B7A8C' }).setLngLat([lng, lat]).addTo(map)
+    markerRef.current = L.marker([lat, lng]).addTo(map)
 
     return () => {
       map.remove()
@@ -36,8 +41,8 @@ export function MiniMap({ lat, lng, className }: MiniMapProps) {
   }, [])
 
   useEffect(() => {
-    mapRef.current?.setCenter([lng, lat])
-    markerRef.current?.setLngLat([lng, lat])
+    mapRef.current?.setView([lat, lng])
+    markerRef.current?.setLatLng([lat, lng])
   }, [lat, lng])
 
   return <div ref={containerRef} className={className ?? 'h-40 w-full rounded-lg'} />
