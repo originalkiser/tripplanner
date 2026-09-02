@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from './features/auth/LoginPage'
 import { PeoplePage } from './features/people/PeoplePage'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { ActivityListPage } from './features/activities/ActivityListPage'
-import { UnplannedPage } from './features/activities/UnplannedPage'
+import { PackingListPage } from './features/packing/PackingListPage'
 import { DigestPage } from './features/digest/DigestPage'
 import { TripAlbumPage } from './features/photos/TripAlbumPage'
 import { HomePage } from './features/home/HomePage'
@@ -28,7 +28,9 @@ function App() {
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/planned" element={<ActivityListPage />} />
-                <Route path="/unplanned" element={<UnplannedPage />} />
+                {/* Unplanned got folded into Plans; keep old links/bookmarks working. */}
+                <Route path="/unplanned" element={<Navigate to="/planned" replace />} />
+                <Route path="/packing" element={<PackingListPage />} />
                 <Route
                   path="/map"
                   element={

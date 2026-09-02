@@ -9,9 +9,18 @@ import { usePendingPollCount } from '../polls/usePendingPollCount'
 import { PollSection } from '../polls/PollSection'
 import { useActivitiesStore, pendingInvites } from '../../stores/activitiesStore'
 import { usePendingInviteCount } from '../activities/usePendingInviteCount'
+import { usePackingStore, type PackingItem } from '../../stores/packingStore'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
+import { googleMapsAddressUrl, appleMapsAddressUrl, isIOS } from '../../lib/geo'
+
+// An item still "needs" someone: uncapped and nobody's bringing it yet, or
+// capped and still short of the quantity needed.
+function stillNeeded(item: PackingItem): boolean {
+  const covered = item.bringers.filter((b) => b.status === 'confirmed').reduce((sum, b) => sum + b.quantity, 0)
+  return item.quantity_needed == null ? covered === 0 : covered < item.quantity_needed
+}
 
 function formatTime(time: string | null): string {
   if (!time) return ''
@@ -47,6 +56,34 @@ export function HomePage() {
   const myPendingInvites = profile ? pendingInvites(activities, profile.id) : []
   const [respondingId, setRespondingId] = useState<string | null>(null)
   const notificationCount = pendingPollCount + pendingInviteCount
+
+  const { lists: packingLists, items: packingItems, fetchLists: fetchPackingLists, fetchItems: fetchPackingItems } =
+    usePackingStore()
+  const tripPackingList = packingLists.find((l) => l.kind === 'trip')
+  const myPrivateLists = packingLists.filter((l) => l.kind === 'private')
+  const privateListIdsKey = myPrivateLists.map((l) => l.id).join(',')
+
+  useEffect(() => {
+    void fetchPackingLists()
+  }, [fetchPackingLists])
+
+  useEffect(() => {
+    if (tripPackingList) void fetchPackingItems(tripPackingList.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripPackingList?.id, fetchPackingItems])
+
+  useEffect(() => {
+    myPrivateLists.forEach((l) => void fetchPackingItems(l.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [privateListIdsKey, fetchPackingItems])
+
+  const groupRemaining = tripPackingList
+    ? (packingItems[tripPackingList.id] ?? []).filter((i) => !i.deleted_at && stillNeeded(i)).length
+    : 0
+  const personalRemaining = myPrivateLists.reduce(
+    (sum, l) => sum + (packingItems[l.id] ?? []).filter((i) => !i.deleted_at && stillNeeded(i)).length,
+    0,
+  )
   const [stay, setStay] = useState<Stay | null>(null)
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -139,7 +176,7 @@ export function HomePage() {
       <h1 className="text-2xl font-semibold text-primary">Home</h1>
       <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Link
           to="/planned"
           className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
@@ -170,6 +207,16 @@ export function HomePage() {
         >
           <AlbumQuickIcon />
           <span className="text-xs font-medium">Album</span>
+        </Link>
+        <Link
+          to="/packing"
+          className="card-shadow flex flex-col items-center gap-1 rounded-xl border border-line bg-surface px-2 py-3 text-center"
+        >
+          <PackingQuickIcon />
+          <span className="text-xs font-medium">Packing List</span>
+          <span className="text-[10px] text-text-dim">
+            {groupRemaining} left{myPrivateLists.length > 0 ? ` · ${personalRemaining} yours` : ''}
+          </span>
         </Link>
         <a
           href="#notifications"
@@ -296,7 +343,21 @@ export function HomePage() {
       {!editing && hasDetails && (
         <div className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
           {stay!.name && <h2 className="font-heading text-lg font-semibold">{stay!.name}</h2>}
-          {stay!.address && <p className="mt-1 text-sm text-text-dim">{stay!.address}</p>}
+          {stay!.address && (
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-sm text-text-dim">{stay!.address}</p>
+              <a
+                href={
+                  isIOS() ? appleMapsAddressUrl(stay!.address) : googleMapsAddressUrl(stay!.address)
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
+              >
+                Open in Maps
+              </a>
+            </div>
+          )}
           {stay!.notes && <p className="mt-3 whitespace-pre-wrap text-sm">{stay!.notes}</p>}
           {stay!.link_url && (
             <a href={stay!.link_url} target="_blank" rel="noreferrer" className="mt-3 block text-sm text-primary underline">
@@ -411,6 +472,19 @@ function AlbumQuickIcon() {
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <circle cx="9" cy="10" r="2" />
       <path d="m21 16-5-4-4 3-3-2-6 5" />
+    </svg>
+  )
+}
+
+function PackingQuickIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 4.5A2.5 2.5 0 0 1 9.5 2h5A2.5 2.5 0 0 1 17 4.5V5H7z" />
+      <rect x="4" y="4" width="16" height="18" rx="3" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 12h5" />
+      <circle cx="9" cy="17" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 17h5" />
     </svg>
   )
 }

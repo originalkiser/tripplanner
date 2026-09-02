@@ -21,6 +21,7 @@ export function ActivityListPage() {
   const [typeFilter, setTypeFilter] = useState<ActivityType | 'all'>('all')
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [quickViewId, setQuickViewId] = useState<string | null>(null)
+  const [showImported, setShowImported] = useState(true)
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('activity')
 
@@ -39,20 +40,26 @@ export function ActivityListPage() {
   const plannedCount = TRIP_DAYS.reduce((sum, d) => sum + byDay(d.date).length, 0)
   const today = todayIso()
 
+  const hasEngagement = (a: (typeof filtered)[number]) =>
+    a.participants.some((p) => p.status === 'joined' || p.status === 'proposed_alt_time')
+
   // Still unplanned, but someone's already joined or suggested a day/time
-  // for it — surfaced here too instead of only living in the Unplanned
-  // tab, since it's no longer just an idea at that point.
-  const needsScheduling = filtered.filter(
-    (a) =>
-      !a.proposed_date &&
-      a.participants.some((p) => p.status === 'joined' || p.status === 'proposed_alt_time'),
-  )
+  // for it — surfaced here since it's no longer just an idea.
+  const needsScheduling = filtered.filter((a) => !a.proposed_date && hasEngagement(a))
+
+  // Everything else unplanned — no day, and nobody's engaged with it yet.
+  // Plans and Unplanned used to be separate tabs; this is that tab's content
+  // folded into its own section here instead, split the same way it always
+  // was (bulk-imported ideas collapsed by default, everything else open).
+  const unplanned = filtered.filter((a) => !a.proposed_date && !hasEngagement(a))
+  const importedIdeas = unplanned.filter((a) => a.source === 'imported_note')
+  const otherIdeas = unplanned.filter((a) => a.source !== 'imported_note')
 
   return (
     <div className="mx-auto max-w-6xl pb-24">
       <div className="sticky top-0 z-20 bg-bg px-4 pb-3 pt-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-semibold text-primary">Planned</h1>
+          <h1 className="text-2xl font-semibold text-primary">Plans</h1>
           <div className="flex rounded-full bg-surface-2 p-0.5 text-xs font-medium">
             <button
               type="button"
@@ -123,9 +130,9 @@ export function ActivityListPage() {
               )
             })}
 
-            {!loading && plannedCount === 0 && (
+            {!loading && plannedCount === 0 && needsScheduling.length === 0 && unplanned.length === 0 && (
               <p className="mt-8 text-center text-sm text-text-dim">
-                Nothing scheduled yet — check the Unplanned tab for ideas, or add something new.
+                Nothing here yet — add something new to get started.
               </p>
             )}
 
@@ -143,6 +150,43 @@ export function ActivityListPage() {
                     <ActivityCard key={a.id} activity={a} highlightId={highlightId} scheduleCallout />
                   ))}
                 </div>
+              </section>
+            )}
+
+            {otherIdeas.length > 0 && (
+              <section className="mt-4">
+                <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
+                  Unplanned
+                </h2>
+                <p className="-mt-1 mb-2 text-xs text-text-dim">
+                  Ideas without a day yet and nobody's joined in — schedule one from its card, or
+                  pull from the shared note.
+                </p>
+                <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {otherIdeas.map((a) => (
+                    <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {importedIdeas.length > 0 && (
+              <section className="mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowImported((v) => !v)}
+                  className="flex w-full items-center justify-between rounded-lg bg-accent/10 px-3 py-2 text-sm font-medium text-accent"
+                >
+                  Imported from shared note ({importedIdeas.length})
+                  <span>{showImported ? '−' : '+'}</span>
+                </button>
+                {showImported && (
+                  <div className="mt-2 grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {importedIdeas.map((a) => (
+                      <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+                    ))}
+                  </div>
+                )}
               </section>
             )}
           </>

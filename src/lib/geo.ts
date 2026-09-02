@@ -49,6 +49,16 @@ export function appleMapsUrl(lat: number, lng: number): string {
   return `https://maps.apple.com/?q=${lat},${lng}`
 }
 
+// Free-text variant for places that only have an address on file, not
+// coordinates — e.g. the Home page's "where we're staying" field.
+export function googleMapsAddressUrl(address: string): string {
+  return `https://maps.google.com/?q=${encodeURIComponent(address)}`
+}
+
+export function appleMapsAddressUrl(address: string): string {
+  return `https://maps.apple.com/?q=${encodeURIComponent(address)}`
+}
+
 export function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(navigator.userAgent)
 }

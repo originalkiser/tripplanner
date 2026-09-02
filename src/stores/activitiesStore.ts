@@ -205,10 +205,26 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
   },
 
   proposeAltTime: async (activityId, userId, date, time) => {
+    // Proposing an alternate time is a suggestion, not a statement about
+    // whether you're attending. The upsert below always writes `status`
+    // (upsert-on-conflict overwrites every column it's given), so writing
+    // 'proposed_alt_time' unconditionally used to silently *un-join* anyone
+    // who was already 'joined' and then proposed a different time for the
+    // same activity — exactly the "lost an attendee" bug. Look up the
+    // existing status first and keep it if they're already joined.
+    const { data: existing } = await supabase
+      .from('activity_participants')
+      .select('status')
+      .eq('activity_id', activityId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    const status: ParticipantStatus = existing?.status === 'joined' ? 'joined' : 'proposed_alt_time'
+
     const { error } = await supabase.from('activity_participants').upsert({
       activity_id: activityId,
       user_id: userId,
-      status: 'proposed_alt_time',
+      status,
       proposed_date: date,
       proposed_time: time,
     })

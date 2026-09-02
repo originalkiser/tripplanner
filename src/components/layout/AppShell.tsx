@@ -19,8 +19,8 @@ const CreateActivityModal = lazy(() =>
 const HIDE_GLOBAL_ADD = ['/album']
 
 const LEFT_TABS = [
-  { to: '/planned', label: 'Planned', end: true, icon: PlannedIcon },
-  { to: '/unplanned', label: 'Unplanned', end: false, icon: UnplannedIcon },
+  { to: '/planned', label: 'Plans', end: true, icon: PlannedIcon },
+  { to: '/packing', label: 'Packing List', end: false, icon: PackingListIcon },
   { to: '/map', label: 'Map', end: false, icon: MapIcon },
 ]
 
@@ -170,14 +170,16 @@ function PlannedIcon({ active }: IconProps) {
   )
 }
 
-function UnplannedIcon({ active }: IconProps) {
+// Clipboard with a checklist — matches the icon style the user supplied.
+function PackingListIcon({ active }: IconProps) {
   return (
     <svg {...iconProps(active)}>
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M3 9h18M8 2v4M16 2v4" />
-      <text x="12" y="18" textAnchor="middle" fontSize="8" fontWeight="700" stroke="none" fill="currentColor">
-        ?
-      </text>
+      <path d="M7 4.5A2.5 2.5 0 0 1 9.5 2h5A2.5 2.5 0 0 1 17 4.5V5H7z" />
+      <rect x="4" y="4" width="16" height="18" rx="3" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 12h5" />
+      <circle cx="9" cy="17" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 17h5" />
     </svg>
   )
 }

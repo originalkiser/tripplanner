@@ -5,6 +5,8 @@ export type ActivityType = 'food' | 'activity' | 'food_and_activity'
 export type ActivityCategory = 'savannah' | 'tybee'
 export type ActivitySource = 'user_added' | 'imported_note'
 export type ParticipantStatus = 'joined' | 'proposed_alt_time' | 'invited'
+export type PackingListKind = 'trip' | 'private'
+export type PackingBringerStatus = 'confirmed' | 'requested'
 export type ChangeType =
   | 'created'
   | 'updated'
@@ -295,6 +297,86 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['trip']['Tables']['poll_votes']['Insert']>
+        Relationships: []
+      }
+      packing_lists: {
+        Row: {
+          id: string
+          trip_id: string
+          kind: PackingListKind
+          name: string | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          kind: PackingListKind
+          name?: string | null
+          created_by: string
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['packing_lists']['Insert']>
+        Relationships: []
+      }
+      packing_list_members: {
+        Row: {
+          packing_list_id: string
+          user_id: string
+          added_by: string
+          created_at: string
+        }
+        Insert: {
+          packing_list_id: string
+          user_id: string
+          added_by: string
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['packing_list_members']['Insert']>
+        Relationships: []
+      }
+      packing_items: {
+        Row: {
+          id: string
+          packing_list_id: string
+          name: string
+          quantity_needed: number | null
+          created_by: string
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+        }
+        Insert: {
+          id?: string
+          packing_list_id: string
+          name: string
+          quantity_needed?: number | null
+          created_by: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+        }
+        Update: Partial<Database['trip']['Tables']['packing_items']['Insert']>
+        Relationships: []
+      }
+      packing_item_bringers: {
+        Row: {
+          packing_item_id: string
+          user_id: string
+          quantity: number
+          status: PackingBringerStatus
+          requested_by: string | null
+          created_at: string
+        }
+        Insert: {
+          packing_item_id: string
+          user_id: string
+          quantity?: number
+          status?: PackingBringerStatus
+          requested_by?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['packing_item_bringers']['Insert']>
         Relationships: []
       }
     }

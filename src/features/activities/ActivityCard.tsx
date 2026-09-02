@@ -140,7 +140,10 @@ export function ActivityCard({
   const rating = avgRating(activity)
   const mine = profile ? activity.participants.find((p) => p.user_id === profile.id) : undefined
   const joined = activity.participants.filter((p) => p.status === 'joined')
-  const proposedAlts = activity.participants.filter((p) => p.status === 'proposed_alt_time')
+  // Based on having a proposed date/time at all, not on status === 'proposed_alt_time'
+  // — someone who was already joined and then proposed a different time keeps
+  // their 'joined' status (see proposeAltTime), so status alone would miss them.
+  const proposedAlts = activity.participants.filter((p) => p.proposed_date && p.proposed_time)
   const earliestProposal = [...proposedAlts]
     .filter((p) => p.proposed_date && p.proposed_time)
     .sort(
@@ -278,20 +281,6 @@ export function ActivityCard({
           </div>
         )}
 
-        {joined.length > 0 && (
-          <div className="mt-2 flex -space-x-2">
-            {joined.map((p) => (
-              <img
-                key={p.user_id}
-                src={resolveAssetUrl(p.profile?.avatar_url) ?? FALLBACK_AVATAR}
-                alt={p.profile?.display_name ?? ''}
-                title={p.profile?.display_name ?? ''}
-                className="h-6 w-6 rounded-full border-2 border-surface object-cover"
-              />
-            ))}
-          </div>
-        )}
-
         {unmatchedProposals.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {unmatchedProposals.map((p) => (
@@ -319,64 +308,76 @@ export function ActivityCard({
           </div>
         )}
 
-        <div className="mt-2 flex items-center justify-between">
-          {activity.source === 'imported_note' ? (
-            <span title="Imported from shared note" className="text-text-dim opacity-60">
-              <ImportedIcon />
-            </span>
-          ) : (
-            <span />
-          )}
-          <span className="text-xs text-text-dim">
-            {joined.length} attending
-          </span>
-        </div>
+        <p className="mt-2 text-xs text-text-dim">{joined.length} attending</p>
       </div>
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        {activity.location_lat != null && activity.location_lng != null ? (
+        <div className="flex -space-x-2">
+          {joined.map((p) => (
+            <img
+              key={p.user_id}
+              src={resolveAssetUrl(p.profile?.avatar_url) ?? FALLBACK_AVATAR}
+              alt={p.profile?.display_name ?? ''}
+              title={p.profile?.display_name ?? ''}
+              className="h-6 w-6 rounded-full border-2 border-surface object-cover"
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setExpanded(true)
+            setShowInvite(true)
+          }}
+          className="shrink-0 rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
+        >
+          + Invite more
+        </button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {activity.location_lat != null && activity.location_lng != null && (
           <Link
             to={`/map?activity=${activity.id}`}
-            className="inline-flex items-center gap-1 text-xs text-primary underline"
+            className="inline-flex items-center gap-1 rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
           >
             <PinIcon /> View on map
           </Link>
-        ) : (
-          <span />
         )}
-
-        <div className="flex shrink-0 gap-2">
+        {activity.location_lat != null && activity.location_lng != null && (
+          <a
+            href={
+              isIOS()
+                ? appleMapsUrl(activity.location_lat, activity.location_lng)
+                : googleMapsUrl(activity.location_lat, activity.location_lng)
+            }
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
+          >
+            Open in Maps
+          </a>
+        )}
+        {activity.link_url && (
+          <a
+            href={activity.link_url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
+          >
+            View link
+          </a>
+        )}
+        {!mine && (
           <button
             type="button"
-            onClick={openProposeForm}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              scheduleCallout && !activity.proposed_date && !earliestProposal
-                ? 'bg-coral text-white'
-                : 'bg-bg'
-            }`}
+            onClick={() => void handleJoin()}
+            disabled={busy}
+            className="ml-auto shrink-0 rounded-full bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
           >
-            {activity.proposed_date ? 'Propose new time' : 'Propose time'}
+            Join
           </button>
-          {mine ? (
-            <button
-              type="button"
-              onClick={() => void handleLeave()}
-              disabled={busy}
-              className="rounded-full bg-red-50 px-3 py-1 text-xs font-medium text-red-600 disabled:opacity-50"
-            >
-              Leave
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handleJoin()}
-              disabled={busy}
-              className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
-            >
-              Join
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {expanded && (
@@ -434,37 +435,31 @@ export function ActivityCard({
 
           {activity.description && <p className="text-sm">{activity.description}</p>}
 
-          {(activity.location_name || activity.link_url) && (
-            <div className="text-sm">
-              {activity.location_name && <p className="text-text-dim">{activity.location_name}</p>}
-              <div className="mt-2 flex flex-wrap gap-2">
-                {activity.location_lat && activity.location_lng && (
-                  <a
-                    href={
-                      isIOS()
-                        ? appleMapsUrl(activity.location_lat, activity.location_lng)
-                        : googleMapsUrl(activity.location_lat, activity.location_lng)
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
-                  >
-                    Open in Maps
-                  </a>
-                )}
-                {activity.link_url && (
-                  <a
-                    href={activity.link_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
-                  >
-                    View link
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
+          {activity.location_name && <p className="text-sm text-text-dim">{activity.location_name}</p>}
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={openProposeForm}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                scheduleCallout && !activity.proposed_date && !earliestProposal
+                  ? 'bg-coral text-white'
+                  : 'bg-bg'
+              }`}
+            >
+              {activity.proposed_date ? 'Propose new time' : 'Propose time'}
+            </button>
+            {mine && (
+              <button
+                type="button"
+                onClick={() => void handleLeave()}
+                disabled={busy}
+                className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-50"
+              >
+                Leave
+              </button>
+            )}
+          </div>
 
           {canEdit && (
             <button
@@ -610,16 +605,6 @@ export function ActivityCard({
         </div>
       )}
     </div>
-  )
-}
-
-function ImportedIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="M7 10l5 5 5-5" />
-      <path d="M12 15V3" />
-    </svg>
   )
 }
 
