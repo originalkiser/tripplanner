@@ -6,6 +6,7 @@ export type ActivityCategory = 'savannah' | 'tybee'
 export type ActivitySource = 'user_added' | 'imported_note'
 export type ParticipantStatus = 'joined' | 'proposed_alt_time' | 'invited'
 export type PackingListKind = 'trip' | 'private'
+export type WifiSecurity = 'WPA' | 'WEP' | 'nopass'
 export type PackingBringerStatus = 'confirmed' | 'requested'
 export type ChangeType =
   | 'created'
@@ -241,6 +242,26 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['trip']['Tables']['stays']['Insert']>
+        Relationships: []
+      }
+      wifi_networks: {
+        Row: {
+          trip_id: string
+          ssid: string | null
+          password: string | null
+          security: WifiSecurity
+          updated_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          trip_id: string
+          ssid?: string | null
+          password?: string | null
+          security?: WifiSecurity
+          updated_by?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['wifi_networks']['Insert']>
         Relationships: []
       }
       activity_polls: {

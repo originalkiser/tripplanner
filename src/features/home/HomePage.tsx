@@ -10,6 +10,7 @@ import { PollSection } from '../polls/PollSection'
 import { useActivitiesStore, pendingInvites } from '../../stores/activitiesStore'
 import { usePendingInviteCount } from '../activities/usePendingInviteCount'
 import { usePackingStore, type PackingItem } from '../../stores/packingStore'
+import { WifiSection } from './WifiSection'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
@@ -434,6 +435,8 @@ export function HomePage() {
           </div>
         </form>
       )}
+
+      <WifiSection />
     </div>
   )
 }
