@@ -11,6 +11,7 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const touchStartX = useRef<number | null>(null)
 
@@ -36,11 +37,19 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
   }
 
   function showPrev() {
-    setLightboxIndex((i) => (i != null ? Math.max(i - 1, 0) : i))
+    setLightboxIndex((i) => {
+      if (i == null || i === 0) return i
+      setSlideDir('left')
+      return i - 1
+    })
   }
 
   function showNext() {
-    setLightboxIndex((i) => (i != null ? Math.min(i + 1, photos.length - 1) : i))
+    setLightboxIndex((i) => {
+      if (i == null || i === photos.length - 1) return i
+      setSlideDir('right')
+      return i + 1
+    })
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -64,7 +73,10 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
           <button
             key={p.id}
             type="button"
-            onClick={() => setLightboxIndex(i)}
+            onClick={() => {
+              setSlideDir(null)
+              setLightboxIndex(i)
+            }}
             className="aspect-square overflow-hidden rounded-lg bg-secondary/10"
           >
             <img src={tripPhotoUrl(p.storage_path)} alt="" className="h-full w-full object-cover" />
@@ -120,9 +132,12 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
             </button>
           )}
           <img
+            key={lightbox.id}
             src={tripPhotoUrl(lightbox.storage_path)}
             alt=""
-            className="max-h-[80vh] max-w-full rounded-lg object-contain"
+            className={`max-h-[80vh] max-w-full rounded-lg object-contain ${
+              slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+            }`}
             onClick={(e) => e.stopPropagation()}
           />
           <div className="mt-3 flex items-center gap-4 text-sm text-white">

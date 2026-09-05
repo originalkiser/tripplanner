@@ -365,9 +365,41 @@ h4 {
   .scene-star,
   .scene-cloud,
   .sun-loader-rays,
-  .sun-loader-core {
+  .sun-loader-core,
+  .photo-slide-in-right,
+  .photo-slide-in-left {
     animation: none !important;
   }
+}
+
+/* Photo lightbox swipe transition — the incoming photo slides in from the
+   side it logically arrived from (next => right, prev => left) instead of
+   just popping into place. */
+@keyframes photo-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes photo-slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.photo-slide-in-right {
+  animation: photo-slide-in-right 220ms ease-out;
+}
+.photo-slide-in-left {
+  animation: photo-slide-in-left 220ms ease-out;
 }
 
 /* Leaflet dark mode — there's still only the one free OSM raster tile
