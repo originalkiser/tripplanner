@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { usePhotosStore, type Photo } from '../../stores/photosStore'
 import { useAuthStore } from '../../stores/authStore'
 import { tripPhotoUrl } from '../../lib/storage'
@@ -98,76 +99,79 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
 
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
 
-      {lightbox && lightboxIndex != null && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightboxIndex(null)}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          <button
-            type="button"
+      {lightbox &&
+        lightboxIndex != null &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
             onClick={() => setLightboxIndex(null)}
-            aria-label="Close"
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
           >
-            &times;
-          </button>
-          {lightboxIndex > 0 && (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                showPrev()
-              }}
-              aria-label="Previous photo"
-              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+              onClick={() => setLightboxIndex(null)}
+              aria-label="Close"
+              className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xl text-white"
             >
-              &#8249;
+              &times;
             </button>
-          )}
-          {lightboxIndex < photos.length - 1 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                showNext()
-              }}
-              aria-label="Next photo"
-              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
-            >
-              &#8250;
-            </button>
-          )}
-          <img
-            key={lightbox.id}
-            src={tripPhotoUrl(lightbox.storage_path)}
-            alt=""
-            className={`max-h-[80vh] max-w-full rounded-lg object-contain ${
-              slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div className="mt-3 flex items-center gap-4 text-sm text-white">
-            <span>{lightbox.uploader?.display_name}</span>
-            {canDelete(lightbox) && (
+            {lightboxIndex > 0 && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  void handleDelete(lightbox)
+                  showPrev()
                 }}
-                className="underline"
+                aria-label="Previous photo"
+                className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
               >
-                Delete
+                &#8249;
               </button>
             )}
-            <button type="button" onClick={() => setLightboxIndex(null)} className="underline">
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+            {lightboxIndex < photos.length - 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  showNext()
+                }}
+                aria-label="Next photo"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+              >
+                &#8250;
+              </button>
+            )}
+            <img
+              key={lightbox.id}
+              src={tripPhotoUrl(lightbox.storage_path)}
+              alt=""
+              className={`max-h-[80vh] max-w-full rounded-lg object-contain ${
+                slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+              }`}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="mt-3 flex items-center gap-4 text-sm text-white">
+              <span>{lightbox.uploader?.display_name}</span>
+              {canDelete(lightbox) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void handleDelete(lightbox)
+                  }}
+                  className="underline"
+                >
+                  Delete
+                </button>
+              )}
+              <button type="button" onClick={() => setLightboxIndex(null)} className="underline">
+                Close
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
