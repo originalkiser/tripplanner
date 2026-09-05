@@ -77,8 +77,8 @@ export function HeroScene() {
             <ellipse cx="118" cy="25" rx="7" ry="3.5" />
           </g>
 
-          <Palm x={30} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
-          <Palm x={186} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
+          <Palm x={19} baseY={50} height={26} trunk="#6b4a2b" fronds={['#2f6b4f', '#357a59']} />
+          <Palm x={200} baseY={50} height={21} trunk="#6b4a2b" fronds={['#357a59', '#2f6b4f']} mirror />
         </g>
 
         <g className="scene-visibility scene-night">
@@ -98,8 +98,8 @@ export function HeroScene() {
           <circle className="scene-sun" cx="175" cy="14" r="6" fill="#eaf2f3" />
           <circle cx="173" cy="12" r="6" fill="#0a1a20" opacity="0.55" />
 
-          <Palm x={30} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
-          <Palm x={186} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
+          <Palm x={19} baseY={50} height={26} trunk="#0a1e24" fronds={['#123038', '#173a44']} />
+          <Palm x={200} baseY={50} height={21} trunk="#0a1e24" fronds={['#173a44', '#123038']} mirror />
         </g>
       </svg>
 
