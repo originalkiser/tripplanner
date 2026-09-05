@@ -49,7 +49,6 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(e) => void handleFile(e)}
             className="hidden"
             disabled={uploading}

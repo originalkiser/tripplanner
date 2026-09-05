@@ -177,7 +177,6 @@ export function TripAlbumPage() {
             ref={fileRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={(e) => void handleUpload(e)}
             className="hidden"
             disabled={uploading}
