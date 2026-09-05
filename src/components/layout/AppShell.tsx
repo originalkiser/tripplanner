@@ -7,6 +7,7 @@ import { NotificationStack } from '../NotificationStack'
 import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
 import { usePendingPhotoCount } from '../../features/photos/usePendingPhotoCount'
+import { useTaggedPhotoCount } from '../../features/photos/useTaggedPhotoCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { usePhotosStore } from '../../stores/photosStore'
 
@@ -39,7 +40,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pendingPollCount = usePendingPollCount()
   const pendingInviteCount = usePendingInviteCount()
   const pendingPhotoCount = usePendingPhotoCount()
-  const pendingCount = pendingPollCount + pendingInviteCount + pendingPhotoCount
+  const taggedPhotoCount = useTaggedPhotoCount()
+  const pendingCount =
+    pendingPollCount + pendingInviteCount + pendingPhotoCount + (taggedPhotoCount > 0 ? 1 : 0)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const fetchAllPhotos = usePhotosStore((s) => s.fetchAll)
 

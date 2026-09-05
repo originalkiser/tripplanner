@@ -181,7 +181,7 @@ export function TripAlbumPage() {
                     onClick={() => setTaggingPhotoId((v) => (v === photo.id ? null : photo.id))}
                     className="rounded-full bg-bg px-2 py-0.5 text-[11px] text-text-dim"
                   >
-                    + Tag someone
+                    {taggingPhotoId === photo.id ? 'Done tagging' : '+ Tag someone'}
                   </button>
                 </div>
 
@@ -193,10 +193,7 @@ export function TripAlbumPage() {
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => {
-                            void addTag(photo.id, m.id, profile!.id)
-                            setTaggingPhotoId(null)
-                          }}
+                          onClick={() => void addTag(photo.id, m.id, profile!.id)}
                           className="rounded-full bg-surface px-2 py-1 text-xs shadow-sm"
                         >
                           {m.display_name}
