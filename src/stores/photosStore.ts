@@ -4,6 +4,8 @@ import { compressImage } from '../lib/imageCompression'
 
 export interface PhotoTag {
   user_id: string
+  tagged_by: string
+  created_at: string
   profile: { display_name: string } | null
 }
 
@@ -26,11 +28,26 @@ export function newPhotosSince(all: Photo[], userId: string, sinceIso: string): 
   return all.filter((p) => p.user_id !== userId && new Date(p.created_at).getTime() > since)
 }
 
+// Tags landed on the given user (by someone else) since the given timestamp
+// — powers the separate "you were tagged" notification.
+export function newTagsSince(all: Photo[], userId: string, sinceIso: string): PhotoTag[] {
+  const since = new Date(sinceIso).getTime()
+  const tags: PhotoTag[] = []
+  for (const photo of all) {
+    for (const tag of photo.tags) {
+      if (tag.user_id === userId && tag.tagged_by !== userId && new Date(tag.created_at).getTime() > since) {
+        tags.push(tag)
+      }
+    }
+  }
+  return tags
+}
+
 const SELECT = `
   id, activity_id, user_id, storage_path, caption, created_at,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
-  tags:photo_tags(user_id, profile:user_profiles!user_id(display_name))
+  tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name))
 `
 
 interface PhotosState {

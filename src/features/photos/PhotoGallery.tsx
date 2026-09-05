@@ -105,6 +105,14 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            aria-label="Close"
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+          >
+            &times;
+          </button>
           {lightboxIndex > 0 && (
             <button
               type="button"
