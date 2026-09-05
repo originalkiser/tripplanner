@@ -3,29 +3,56 @@ import { usePhotosStore, type Photo } from '../../stores/photosStore'
 import { useAuthStore } from '../../stores/authStore'
 import { tripPhotoUrl } from '../../lib/storage'
 
+const SWIPE_THRESHOLD_PX = 50
+
 export function PhotoGallery({ activityId, photos }: { activityId: string | null; photos: Photo[] }) {
   const profile = useAuthStore((s) => s.profile)
   const { upload, remove } = usePhotosStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [lightbox, setLightbox] = useState<Photo | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const touchStartX = useRef<number | null>(null)
+
+  const lightbox = lightboxIndex != null ? photos[lightboxIndex] : null
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !profile) return
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0 || !profile) return
     setUploading(true)
     setError(null)
-    const { error } = await upload(file, profile.id, activityId)
+    for (const file of files) {
+      const { error } = await upload(file, profile.id, activityId)
+      if (error) setError(error)
+    }
     setUploading(false)
-    if (error) setError(error)
     if (fileRef.current) fileRef.current.value = ''
   }
 
   async function handleDelete(photo: Photo) {
     if (!confirm('Delete this photo?')) return
     await remove(photo)
-    setLightbox(null)
+    setLightboxIndex(null)
+  }
+
+  function showPrev() {
+    setLightboxIndex((i) => (i != null ? Math.max(i - 1, 0) : i))
+  }
+
+  function showNext() {
+    setLightboxIndex((i) => (i != null ? Math.min(i + 1, photos.length - 1) : i))
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current == null) return
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (deltaX > SWIPE_THRESHOLD_PX) showPrev()
+    else if (deltaX < -SWIPE_THRESHOLD_PX) showNext()
   }
 
   const canDelete = (photo: Photo) => profile && (profile.id === photo.user_id || profile.is_admin)
@@ -33,11 +60,11 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
   return (
     <div>
       <div className="grid grid-cols-3 gap-1.5">
-        {photos.map((p) => (
+        {photos.map((p, i) => (
           <button
             key={p.id}
             type="button"
-            onClick={() => setLightbox(p)}
+            onClick={() => setLightboxIndex(i)}
             className="aspect-square overflow-hidden rounded-lg bg-secondary/10"
           >
             <img src={tripPhotoUrl(p.storage_path)} alt="" className="h-full w-full object-cover" />
@@ -49,6 +76,7 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
             ref={fileRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={(e) => void handleFile(e)}
             className="hidden"
             disabled={uploading}
@@ -58,11 +86,39 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
 
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
 
-      {lightbox && (
+      {lightbox && lightboxIndex != null && (
         <div
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxIndex(null)}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
         >
+          {lightboxIndex > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                showPrev()
+              }}
+              aria-label="Previous photo"
+              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+            >
+              &#8249;
+            </button>
+          )}
+          {lightboxIndex < photos.length - 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                showNext()
+              }}
+              aria-label="Next photo"
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+            >
+              &#8250;
+            </button>
+          )}
           <img
             src={tripPhotoUrl(lightbox.storage_path)}
             alt=""
@@ -83,7 +139,7 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
                 Delete
               </button>
             )}
-            <button type="button" onClick={() => setLightbox(null)} className="underline">
+            <button type="button" onClick={() => setLightboxIndex(null)} className="underline">
               Close
             </button>
           </div>

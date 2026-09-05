@@ -8,6 +8,8 @@ import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
 
+const SWIPE_THRESHOLD_PX = 50
+
 function formatTaken(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     month: 'short',
@@ -26,8 +28,11 @@ export function TripAlbumPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [uploading, setUploading] = useState(false)
   const [taggingPhotoId, setTaggingPhotoId] = useState<string | null>(null)
-  const [lightbox, setLightbox] = useState<Photo | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const touchStartX = useRef<number | null>(null)
+
+  const lightbox = lightboxIndex != null ? all[lightboxIndex] : null
 
   useEffect(() => {
     void fetchAll()
@@ -40,10 +45,12 @@ export function TripAlbumPage() {
   }, [fetchAll, fetchActivities])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !profile) return
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0 || !profile) return
     setUploading(true)
-    await upload(file, profile.id, null)
+    for (const file of files) {
+      await upload(file, profile.id, null)
+    }
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -51,7 +58,27 @@ export function TripAlbumPage() {
   async function handleDelete(photo: Photo) {
     if (!confirm('Delete this photo for everyone?')) return
     await remove(photo)
-    setLightbox(null)
+    setLightboxIndex(null)
+  }
+
+  function showPrev() {
+    setLightboxIndex((i) => (i != null ? Math.max(i - 1, 0) : i))
+  }
+
+  function showNext() {
+    setLightboxIndex((i) => (i != null ? Math.min(i + 1, all.length - 1) : i))
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current == null) return
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (deltaX > SWIPE_THRESHOLD_PX) showPrev()
+    else if (deltaX < -SWIPE_THRESHOLD_PX) showNext()
   }
 
   return (
@@ -65,7 +92,7 @@ export function TripAlbumPage() {
             <button
               key={photo.id}
               type="button"
-              onClick={() => setLightbox(photo)}
+              onClick={() => setLightboxIndex(i)}
               className="card-shadow relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-surface bg-surface"
               style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i, transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 4}deg)` }}
             >
@@ -81,11 +108,11 @@ export function TripAlbumPage() {
       )}
 
       <div className="mt-4 flex flex-col gap-4">
-        {all.map((photo) => {
+        {all.map((photo, i) => {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-              <button type="button" onClick={() => setLightbox(photo)} className="block w-full">
+              <button type="button" onClick={() => setLightboxIndex(i)} className="block w-full">
                 <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
               </button>
               <div className="flex flex-col gap-2 p-3 text-sm">
@@ -177,6 +204,7 @@ export function TripAlbumPage() {
             ref={fileRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={(e) => void handleUpload(e)}
             className="hidden"
             disabled={uploading}
@@ -184,19 +212,47 @@ export function TripAlbumPage() {
         </label>
       </div>
 
-      {lightbox && (
+      {lightbox && lightboxIndex != null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxIndex(null)}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
         >
           <button
             type="button"
-            onClick={() => setLightbox(null)}
+            onClick={() => setLightboxIndex(null)}
             aria-label="Close"
             className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-xl text-white"
           >
             &times;
           </button>
+          {lightboxIndex > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                showPrev()
+              }}
+              aria-label="Previous photo"
+              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+            >
+              &#8249;
+            </button>
+          )}
+          {lightboxIndex < all.length - 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                showNext()
+              }}
+              aria-label="Next photo"
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/20 text-xl text-white"
+            >
+              &#8250;
+            </button>
+          )}
           <img
             src={tripPhotoUrl(lightbox.storage_path)}
             alt=""
