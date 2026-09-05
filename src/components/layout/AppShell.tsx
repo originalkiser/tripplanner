@@ -6,7 +6,9 @@ import { HappeningNowBanner } from '../HappeningNowBanner'
 import { NotificationStack } from '../NotificationStack'
 import { usePendingPollCount } from '../../features/polls/usePendingPollCount'
 import { usePendingInviteCount } from '../../features/activities/usePendingInviteCount'
+import { usePendingPhotoCount } from '../../features/photos/usePendingPhotoCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
+import { usePhotosStore } from '../../stores/photosStore'
 
 // Pulls in Leaflet (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -36,12 +38,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showGlobalAdd = !HIDE_GLOBAL_ADD.includes(location.pathname)
   const pendingPollCount = usePendingPollCount()
   const pendingInviteCount = usePendingInviteCount()
-  const pendingCount = pendingPollCount + pendingInviteCount
+  const pendingPhotoCount = usePendingPhotoCount()
+  const pendingCount = pendingPollCount + pendingInviteCount + pendingPhotoCount
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
+  const fetchAllPhotos = usePhotosStore((s) => s.fetchAll)
 
   useEffect(() => {
     void fetchActivities()
   }, [fetchActivities])
+
+  useEffect(() => {
+    void fetchAllPhotos()
+  }, [fetchAllPhotos])
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
