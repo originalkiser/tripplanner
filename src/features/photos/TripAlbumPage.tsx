@@ -29,6 +29,7 @@ export function TripAlbumPage() {
   const [uploading, setUploading] = useState(false)
   const [taggingPhotoId, setTaggingPhotoId] = useState<string | null>(null)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const touchStartX = useRef<number | null>(null)
 
@@ -62,11 +63,19 @@ export function TripAlbumPage() {
   }
 
   function showPrev() {
-    setLightboxIndex((i) => (i != null ? Math.max(i - 1, 0) : i))
+    setLightboxIndex((i) => {
+      if (i == null || i === 0) return i
+      setSlideDir('left')
+      return i - 1
+    })
   }
 
   function showNext() {
-    setLightboxIndex((i) => (i != null ? Math.min(i + 1, all.length - 1) : i))
+    setLightboxIndex((i) => {
+      if (i == null || i === all.length - 1) return i
+      setSlideDir('right')
+      return i + 1
+    })
   }
 
   function onTouchStart(e: React.TouchEvent) {
@@ -92,7 +101,10 @@ export function TripAlbumPage() {
             <button
               key={photo.id}
               type="button"
-              onClick={() => setLightboxIndex(i)}
+              onClick={() => {
+                setSlideDir(null)
+                setLightboxIndex(i)
+              }}
               className="card-shadow relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-surface bg-surface"
               style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i, transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 4}deg)` }}
             >
@@ -112,7 +124,10 @@ export function TripAlbumPage() {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-              <button type="button" onClick={() => setLightboxIndex(i)} className="block w-full">
+              <button type="button" onClick={() => {
+                setSlideDir(null)
+                setLightboxIndex(i)
+              }} className="block w-full">
                 <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
               </button>
               <div className="flex flex-col gap-2 p-3 text-sm">
@@ -254,9 +269,12 @@ export function TripAlbumPage() {
             </button>
           )}
           <img
+            key={lightbox.id}
             src={tripPhotoUrl(lightbox.storage_path)}
             alt=""
-            className="max-h-[75vh] max-w-full rounded-lg object-contain"
+            className={`max-h-[75vh] max-w-full rounded-lg object-contain ${
+              slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+            }`}
             onClick={(e) => e.stopPropagation()}
           />
           <div

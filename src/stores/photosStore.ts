@@ -92,28 +92,36 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
   },
 
   upload: async (file, userId, activityId) => {
-    const compressed = await compressImage(file)
-    const ext = 'jpg'
-    const folder = activityId ?? 'album'
-    const path = `${folder}/${crypto.randomUUID()}.${ext}`
+    try {
+      const compressed = await compressImage(file)
+      const ext = 'jpg'
+      const folder = activityId ?? 'album'
+      const path = `${folder}/${crypto.randomUUID()}.${ext}`
 
-    const { error: uploadError } = await supabase.storage
-      .from('trip-photos')
-      .upload(path, compressed, { contentType: 'image/jpeg' })
-    if (uploadError) return { error: uploadError.message }
+      const { error: uploadError } = await supabase.storage
+        .from('trip-photos')
+        .upload(path, compressed, { contentType: 'image/jpeg' })
+      if (uploadError) return { error: uploadError.message }
 
-    const { error: insertError } = await supabase.from('activity_photos').insert({
-      activity_id: activityId,
-      user_id: userId,
-      storage_path: path,
-    })
-    if (insertError) return { error: insertError.message }
+      const { error: insertError } = await supabase.from('activity_photos').insert({
+        activity_id: activityId,
+        user_id: userId,
+        storage_path: path,
+      })
+      if (insertError) return { error: insertError.message }
 
-    if (activityId) await get().fetchForActivity(activityId)
-    else await get().fetchAlbum()
-    await get().fetchAll()
+      if (activityId) await get().fetchForActivity(activityId)
+      else await get().fetchAlbum()
+      await get().fetchAll()
 
-    return { error: null }
+      return { error: null }
+    } catch (err) {
+      // A bad/unsupported file (e.g. a format createImageBitmap can't
+      // decode) throws instead of rejecting cleanly — without this, one bad
+      // file in a multi-select batch would abort the whole upload loop with
+      // no error and leave the caller's "uploading" state stuck forever.
+      return { error: err instanceof Error ? err.message : 'Upload failed' }
+    }
   },
 
   remove: async (photo) => {
