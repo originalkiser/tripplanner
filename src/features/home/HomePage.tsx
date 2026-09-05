@@ -10,6 +10,8 @@ import { PollSection } from '../polls/PollSection'
 import { useActivitiesStore, pendingInvites } from '../../stores/activitiesStore'
 import { usePendingInviteCount } from '../activities/usePendingInviteCount'
 import { usePackingStore, type PackingItem } from '../../stores/packingStore'
+import { usePhotosStore, newPhotosSince } from '../../stores/photosStore'
+import { usePhotoSeenStore } from '../../stores/photoSeenStore'
 import { WifiSection } from './WifiSection'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
@@ -21,6 +23,24 @@ import { googleMapsAddressUrl, appleMapsAddressUrl, isIOS } from '../../lib/geo'
 function stillNeeded(item: PackingItem): boolean {
   const covered = item.bringers.filter((b) => b.status === 'confirmed').reduce((sum, b) => sum + b.quantity, 0)
   return item.quantity_needed == null ? covered === 0 : covered < item.quantity_needed
+}
+
+interface PhotoNotificationGroup {
+  userId: string
+  name: string
+  count: number
+}
+
+// One card per uploader rather than one per photo — someone dropping in ten
+// vacation pics shouldn't produce ten notification cards.
+function groupPhotosByUploader(photos: ReturnType<typeof newPhotosSince>): PhotoNotificationGroup[] {
+  const groups: PhotoNotificationGroup[] = []
+  for (const photo of photos) {
+    const existing = groups.find((g) => g.userId === photo.user_id)
+    if (existing) existing.count += 1
+    else groups.push({ userId: photo.user_id, name: photo.uploader?.display_name ?? 'Someone', count: 1 })
+  }
+  return groups
 }
 
 function formatTime(time: string | null): string {
@@ -56,7 +76,12 @@ export function HomePage() {
   const pendingInviteCount = usePendingInviteCount()
   const myPendingInvites = profile ? pendingInvites(activities, profile.id) : []
   const [respondingId, setRespondingId] = useState<string | null>(null)
-  const notificationCount = pendingPollCount + pendingInviteCount
+  const allPhotos = usePhotosStore((s) => s.all)
+  const photoLastSeenAt = usePhotoSeenStore((s) => s.lastSeenAt)
+  const newPhotoGroups = profile
+    ? groupPhotosByUploader(newPhotosSince(allPhotos, profile.id, photoLastSeenAt))
+    : []
+  const notificationCount = pendingPollCount + pendingInviteCount + newPhotoGroups.length
 
   const { lists: packingLists, items: packingItems, fetchLists: fetchPackingLists, fetchItems: fetchPackingItems } =
     usePackingStore()
@@ -266,7 +291,7 @@ export function HomePage() {
         <h2 className="mb-2 font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
           Notifications {notificationCount > 0 && `(${notificationCount})`}
         </h2>
-        {myPendingPolls.length === 0 && myPendingInvites.length === 0 ? (
+        {myPendingPolls.length === 0 && myPendingInvites.length === 0 && newPhotoGroups.length === 0 ? (
           <p className="card-shadow rounded-xl border border-dashed border-line bg-surface p-4 text-center text-sm text-text-dim">
             You're all caught up
           </p>
@@ -336,6 +361,18 @@ export function HomePage() {
                 </div>
                 <PollSection poll={poll} compact />
               </div>
+            ))}
+            {newPhotoGroups.map((g) => (
+              <Link
+                key={g.userId}
+                to="/album"
+                className="card-shadow block rounded-xl border border-line bg-surface p-3"
+              >
+                <p className="text-xs font-medium text-text-dim">📸 New photos</p>
+                <h3 className="font-heading text-base font-semibold">
+                  {g.name} added {g.count > 1 ? `${g.count} photos` : 'a photo'}
+                </h3>
+              </Link>
             ))}
           </div>
         )}

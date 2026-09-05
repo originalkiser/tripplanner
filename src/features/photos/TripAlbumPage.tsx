@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePhotosStore, type Photo } from '../../stores/photosStore'
+import { usePhotoSeenStore } from '../../stores/photoSeenStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
@@ -24,6 +25,7 @@ export function TripAlbumPage() {
   const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag } = usePhotosStore()
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
+  const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
 
   const [members, setMembers] = useState<Member[]>([])
   const [uploading, setUploading] = useState(false)
@@ -44,6 +46,12 @@ export function TripAlbumPage() {
       .order('display_name')
       .then(({ data }) => setMembers(data ?? []))
   }, [fetchAll, fetchActivities])
+
+  // Opening the album is what "reading" a new-photos notification means —
+  // clear it the moment someone lands here, not just when they act on it.
+  useEffect(() => {
+    markPhotosSeen()
+  }, [markPhotosSeen])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])

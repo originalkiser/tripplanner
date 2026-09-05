@@ -19,6 +19,13 @@ export interface Photo {
   tags: PhotoTag[]
 }
 
+// Photos uploaded by someone other than the given user since the given
+// timestamp — powers the Home "new photos" notification.
+export function newPhotosSince(all: Photo[], userId: string, sinceIso: string): Photo[] {
+  const since = new Date(sinceIso).getTime()
+  return all.filter((p) => p.user_id !== userId && new Date(p.created_at).getTime() > since)
+}
+
 const SELECT = `
   id, activity_id, user_id, storage_path, caption, created_at,
   uploader:user_profiles!user_id(display_name),
