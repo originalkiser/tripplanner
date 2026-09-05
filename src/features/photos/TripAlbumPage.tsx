@@ -6,6 +6,7 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl } from '../../lib/storage'
+import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -35,6 +36,11 @@ export function TripAlbumPage() {
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const touchStartX = useRef<number | null>(null)
+  const isPinching = useRef(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
 
   const lightbox = lightboxIndex != null ? all[lightboxIndex] : null
 
@@ -87,11 +93,32 @@ export function TripAlbumPage() {
     })
   }
 
+  // A pinch-to-zoom gesture is two touch points — without this, its second
+  // finger lifting off got read as a one-finger swipe (using whichever
+  // finger happened to be in `changedTouches`), flipping to the next/prev
+  // photo right as someone zoomed in on the current one.
   function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length > 1) {
+      isPinching.current = true
+      touchStartX.current = null
+      return
+    }
+    isPinching.current = false
     touchStartX.current = e.touches[0].clientX
   }
 
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length > 1) {
+      isPinching.current = true
+      touchStartX.current = null
+    }
+  }
+
   function onTouchEnd(e: React.TouchEvent) {
+    if (isPinching.current) {
+      isPinching.current = false
+      return
+    }
     if (touchStartX.current == null) return
     const deltaX = e.changedTouches[0].clientX - touchStartX.current
     touchStartX.current = null
@@ -99,10 +126,72 @@ export function TripAlbumPage() {
     else if (deltaX < -SWIPE_THRESHOLD_PX) showNext()
   }
 
+  async function handleDownload(photo: Photo) {
+    setDownloadingId(photo.id)
+    try {
+      await downloadPhoto(photo)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
+
+  function toggleSelected(photoId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(photoId)) next.delete(photoId)
+      else next.add(photoId)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === all.length ? new Set() : new Set(all.map((p) => p.id))))
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  function openPhoto(i: number) {
+    const photo = all[i]
+    if (selectMode) {
+      toggleSelected(photo.id)
+      return
+    }
+    setSlideDir(null)
+    setLightboxIndex(i)
+  }
+
+  async function handleDownloadSelected() {
+    const selected = all.filter((p) => selectedIds.has(p.id))
+    if (selected.length === 0) return
+    setZipping({ done: 0, total: selected.length })
+    try {
+      await downloadPhotosAsZip(selected, (done, total) => setZipping({ done, total }))
+      exitSelectMode()
+    } finally {
+      setZipping(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-md p-4 pb-32">
-      <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
-      <p className="mt-1 text-sm text-text-dim">Every photo from the trip, in time order.</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
+          <p className="mt-1 text-sm text-text-dim">Every photo from the trip, in time order.</p>
+        </div>
+        {all.length > 0 && (
+          <button
+            type="button"
+            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+          >
+            {selectMode ? 'Cancel' : 'Select'}
+          </button>
+        )}
+      </div>
 
       {all.length > 0 && (
         <div className="mt-4 -mx-4 flex gap-0 overflow-x-auto px-6 py-3">
@@ -110,14 +199,20 @@ export function TripAlbumPage() {
             <button
               key={photo.id}
               type="button"
-              onClick={() => {
-                setSlideDir(null)
-                setLightboxIndex(i)
-              }}
+              onClick={() => openPhoto(i)}
               className="card-shadow relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-surface bg-surface"
               style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i, transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 4}deg)` }}
             >
               <img src={tripPhotoUrl(photo.storage_path)} alt="" className="h-full w-full object-cover" />
+              {selectMode && (
+                <span
+                  className={`absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[11px] text-white ${
+                    selectedIds.has(photo.id) ? 'bg-primary' : 'bg-black/30'
+                  }`}
+                >
+                  {selectedIds.has(photo.id) ? '✓' : ''}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -133,11 +228,17 @@ export function TripAlbumPage() {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-              <button type="button" onClick={() => {
-                setSlideDir(null)
-                setLightboxIndex(i)
-              }} className="block w-full">
+              <button type="button" onClick={() => openPhoto(i)} className="relative block w-full">
                 <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
+                {selectMode && (
+                  <span
+                    className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-sm text-white ${
+                      selectedIds.has(photo.id) ? 'bg-primary' : 'bg-black/30'
+                    }`}
+                  >
+                    {selectedIds.has(photo.id) ? '✓' : ''}
+                  </span>
+                )}
               </button>
               <div className="flex flex-col gap-2 p-3 text-sm">
                 <div className="flex items-center justify-between">
@@ -219,27 +320,50 @@ export function TripAlbumPage() {
       </div>
 
       <div className="fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-md px-4">
-        <label className="card-shadow flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface py-3 text-sm font-medium text-primary">
-          {uploading ? 'Uploading…' : '+ Add a photo'}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => void handleUpload(e)}
-            className="hidden"
-            disabled={uploading}
-          />
-        </label>
+        {selectMode ? (
+          <div className="card-shadow flex items-center gap-2 rounded-xl border border-line bg-surface p-2">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="shrink-0 rounded-lg bg-bg px-3 py-2 text-xs font-medium text-text-dim"
+            >
+              {selectedIds.size === all.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <button
+              type="button"
+              disabled={selectedIds.size === 0 || zipping != null}
+              onClick={() => void handleDownloadSelected()}
+              className="flex-1 rounded-lg bg-coral py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {zipping
+                ? `Zipping ${zipping.done}/${zipping.total}…`
+                : `Download${selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}`}
+            </button>
+          </div>
+        ) : (
+          <label className="card-shadow flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface py-3 text-sm font-medium text-primary">
+            {uploading ? 'Uploading…' : '+ Add a photo'}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => void handleUpload(e)}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+        )}
       </div>
 
       {lightbox &&
         lightboxIndex != null &&
         createPortal(
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-2"
             onClick={() => setLightboxIndex(null)}
             onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
           >
             <button
@@ -280,16 +404,24 @@ export function TripAlbumPage() {
               key={lightbox.id}
               src={tripPhotoUrl(lightbox.storage_path)}
               alt=""
-              className={`max-h-[75vh] max-w-full rounded-lg object-contain ${
+              className={`max-h-[96dvh] max-w-full object-contain ${
                 slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
               }`}
               onClick={(e) => e.stopPropagation()}
             />
             <div
-              className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
+              className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
               onClick={(e) => e.stopPropagation()}
             >
               <span>{lightbox.uploader?.display_name}</span>
+              <button
+                type="button"
+                disabled={downloadingId === lightbox.id}
+                onClick={() => void handleDownload(lightbox)}
+                className="underline disabled:opacity-50"
+              >
+                {downloadingId === lightbox.id ? 'Downloading…' : 'Download'}
+              </button>
               {profile && (profile.id === lightbox.user_id || profile.is_admin) && (
                 <button type="button" onClick={() => void handleDelete(lightbox)} className="underline">
                   Delete

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { usePhotosStore, type Photo } from '../../stores/photosStore'
 import { useAuthStore } from '../../stores/authStore'
 import { tripPhotoUrl } from '../../lib/storage'
+import { downloadPhoto } from '../../lib/downloadPhotos'
 
 const SWIPE_THRESHOLD_PX = 50
 
@@ -14,7 +15,9 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const touchStartX = useRef<number | null>(null)
+  const isPinching = useRef(false)
 
   const lightbox = lightboxIndex != null ? photos[lightboxIndex] : null
 
@@ -53,16 +56,46 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
     })
   }
 
+  // A pinch-to-zoom gesture is two touch points — without this, its second
+  // finger lifting off got read as a one-finger swipe (using whichever
+  // finger happened to be in `changedTouches`), flipping to the next/prev
+  // photo right as someone zoomed in on the current one.
   function onTouchStart(e: React.TouchEvent) {
+    if (e.touches.length > 1) {
+      isPinching.current = true
+      touchStartX.current = null
+      return
+    }
+    isPinching.current = false
     touchStartX.current = e.touches[0].clientX
   }
 
+  function onTouchMove(e: React.TouchEvent) {
+    if (e.touches.length > 1) {
+      isPinching.current = true
+      touchStartX.current = null
+    }
+  }
+
   function onTouchEnd(e: React.TouchEvent) {
+    if (isPinching.current) {
+      isPinching.current = false
+      return
+    }
     if (touchStartX.current == null) return
     const deltaX = e.changedTouches[0].clientX - touchStartX.current
     touchStartX.current = null
     if (deltaX > SWIPE_THRESHOLD_PX) showPrev()
     else if (deltaX < -SWIPE_THRESHOLD_PX) showNext()
+  }
+
+  async function handleDownload(photo: Photo) {
+    setDownloading(true)
+    try {
+      await downloadPhoto(photo)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const canDelete = (photo: Photo) => profile && (profile.id === photo.user_id || profile.is_admin)
@@ -103,9 +136,10 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
         lightboxIndex != null &&
         createPortal(
           <div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2"
             onClick={() => setLightboxIndex(null)}
             onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
             onTouchEnd={onTouchEnd}
           >
             <button
@@ -146,28 +180,29 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
               key={lightbox.id}
               src={tripPhotoUrl(lightbox.storage_path)}
               alt=""
-              className={`max-h-[80vh] max-w-full rounded-lg object-contain ${
+              className={`max-h-[96dvh] max-w-full object-contain ${
                 slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
               }`}
               onClick={(e) => e.stopPropagation()}
             />
-            <div className="mt-3 flex items-center gap-4 text-sm text-white">
+            <div
+              className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
               <span>{lightbox.uploader?.display_name}</span>
+              <button
+                type="button"
+                disabled={downloading}
+                onClick={() => void handleDownload(lightbox)}
+                className="underline disabled:opacity-50"
+              >
+                {downloading ? 'Downloading…' : 'Download'}
+              </button>
               {canDelete(lightbox) && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handleDelete(lightbox)
-                  }}
-                  className="underline"
-                >
+                <button type="button" onClick={() => void handleDelete(lightbox)} className="underline">
                   Delete
                 </button>
               )}
-              <button type="button" onClick={() => setLightboxIndex(null)} className="underline">
-                Close
-              </button>
             </div>
           </div>,
           document.body,
