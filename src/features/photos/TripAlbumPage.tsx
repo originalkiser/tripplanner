@@ -6,6 +6,7 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl } from '../../lib/storage'
+import { searchLocations, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
@@ -41,7 +42,8 @@ function formatDayLabel(dayKey: string): string {
 
 export function TripAlbumPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike } = usePhotosStore()
+  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike, setPhotoLocation } =
+    usePhotosStore()
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
@@ -62,6 +64,11 @@ export function TripAlbumPage() {
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTap = useRef<{ photoId: string; time: number } | null>(null)
   const [sortMode, setSortMode] = useState<SortMode>('uploaded-asc')
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+  const [locationQuery, setLocationQuery] = useState('')
+  const [locationResults, setLocationResults] = useState<LocationResult[]>([])
+  const [savingLocation, setSavingLocation] = useState(false)
+  const locationSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const sortField = sortMode.startsWith('taken') ? 'taken_at' : 'created_at'
   const sortDir = sortMode.endsWith('asc') ? 1 : -1
@@ -193,6 +200,34 @@ export function TripAlbumPage() {
   function handleLikeToggle(photo: Photo) {
     if (!profile) return
     void toggleLike(photo, profile.id, hasLiked(photo, profile.id))
+  }
+
+  function startEditingLocation(photo: Photo) {
+    setEditingLocationId(photo.id)
+    setLocationQuery(photo.location_name ?? '')
+    setLocationResults([])
+  }
+
+  function onLocationInput(value: string) {
+    setLocationQuery(value)
+    if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current)
+    locationSearchTimer.current = setTimeout(async () => {
+      setLocationResults(await searchLocations(value))
+    }, 400)
+  }
+
+  // Picking a suggestion sets real coordinates; just typing a name and
+  // saving keeps whatever coordinates the photo already had (renaming, not
+  // moving it) — or none, for a purely descriptive tag like "our Airbnb".
+  async function saveLocation(photo: Photo, picked?: LocationResult) {
+    setSavingLocation(true)
+    const name = picked?.displayName ?? (locationQuery.trim() || null)
+    const lat = picked?.lat ?? (name ? photo.location_lat : null)
+    const lng = picked?.lng ?? (name ? photo.location_lng : null)
+    await setPhotoLocation(photo, { name, lat, lng })
+    setSavingLocation(false)
+    setEditingLocationId(null)
+    setLocationResults([])
   }
 
   // Double-tap always likes (never unlikes) and always plays the heart
@@ -427,6 +462,58 @@ export function TripAlbumPage() {
                   <HeartIcon filled={!!profile && hasLiked(photo, profile.id)} className="h-5 w-5" />
                   {photo.likes.length > 0 && <span className="font-data text-xs">{photo.likes.length}</span>}
                 </button>
+
+                {editingLocationId === photo.id ? (
+                  <div className="relative">
+                    <div className="flex gap-1">
+                      <input
+                        autoFocus
+                        value={locationQuery}
+                        onChange={(e) => onLocationInput(e.target.value)}
+                        placeholder="Name this location"
+                        className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingLocation}
+                        onClick={() => void saveLocation(photo)}
+                        className="shrink-0 rounded-lg bg-primary px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingLocationId(null)}
+                        className="shrink-0 rounded-lg bg-bg px-2 py-1 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {locationResults.length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+                        {locationResults.map((r) => (
+                          <li key={r.placeId}>
+                            <button
+                              type="button"
+                              onClick={() => void saveLocation(photo, r)}
+                              className="block w-full px-2 py-1.5 text-left text-xs hover:bg-bg"
+                            >
+                              {r.displayName}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startEditingLocation(photo)}
+                    className="flex items-center gap-1 self-start rounded-full bg-bg px-2 py-1 text-xs text-text-dim"
+                  >
+                    📍 {photo.location_name ?? 'Add location'}
+                  </button>
+                )}
 
                 <select
                   value={photo.activity_id ?? ''}

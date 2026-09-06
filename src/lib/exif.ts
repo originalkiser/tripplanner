@@ -1,4 +1,4 @@
-import { parse } from 'exifr'
+import { parse, gps } from 'exifr'
 
 // The photo's actual capture time from its EXIF data, when present — falls
 // back to null (caller uses upload time instead) for files with no EXIF at
@@ -11,6 +11,17 @@ export async function getPhotoTakenAt(file: File): Promise<Date | null> {
     const tags = await parse(file, ['DateTimeOriginal', 'CreateDate'])
     const takenAt = tags?.DateTimeOriginal ?? tags?.CreateDate
     return takenAt instanceof Date && !isNaN(takenAt.getTime()) ? takenAt : null
+  } catch {
+    return null
+  }
+}
+
+// Same caveat as above: only the original file (pre-compression) still has
+// GPS EXIF at all.
+export async function getPhotoLocation(file: File): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const coords = await gps(file)
+    return coords ? { lat: coords.latitude, lng: coords.longitude } : null
   } catch {
     return null
   }

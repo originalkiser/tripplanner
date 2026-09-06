@@ -106,6 +106,7 @@ interface ActivitiesState {
   adoptProposedTime: (activityId: string, date: string, time: string) => Promise<{ error: string | null }>
   inviteParticipants: (activityId: string, userIds: string[]) => Promise<{ error: string | null }>
   respondToInvite: (activityId: string, userId: string, accept: boolean) => Promise<{ error: string | null }>
+  deleteActivity: (activityId: string) => Promise<{ error: string | null }>
 }
 
 function toRow(input: ActivityFields) {
@@ -295,6 +296,13 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
         .eq('user_id', userId)
       if (error) return { error: error.message }
     }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  deleteActivity: async (activityId) => {
+    const { error } = await supabase.from('activities').delete().eq('id', activityId)
+    if (error) return { error: error.message }
     await get().fetchActivities()
     return { error: null }
   },
