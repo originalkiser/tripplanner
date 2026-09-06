@@ -262,7 +262,7 @@ export function CreateActivityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
+    <div className="fixed inset-0 z-50 flex h-[100dvh] flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
       <div className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface">
         <div className="flex items-center justify-between border-b border-line p-4">
           <h2 className="text-xl font-semibold text-primary">
@@ -274,8 +274,9 @@ export function CreateActivityModal({
         </div>
 
         <form
+          id="activity-form"
           onSubmit={submit}
-          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4"
         >
           <div className="flex gap-2">
             {TYPE_OPTIONS.map((opt) => (
@@ -501,16 +502,22 @@ export function CreateActivityModal({
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+        </form>
 
+        {/* Outside the scrollable form (referenced via form="activity-form")
+            so the primary action is always reachable without depending on
+            touch-scroll working perfectly on every device. */}
+        <div className="shrink-0 border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
           <button
             type="submit"
+            form="activity-form"
             disabled={saving}
-            className="rounded-xl bg-primary px-4 py-3 font-medium text-white disabled:opacity-50"
+            className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-white disabled:opacity-50"
           >
             {saving ? 'Saving…' : isEdit ? 'Save changes' : logMode ? 'Log Visit' : 'Add Activity'}
           </button>
-        </form>
+        </div>
       </div>
     </div>
   )
