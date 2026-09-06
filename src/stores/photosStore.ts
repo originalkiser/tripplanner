@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/imageCompression'
+import { getPhotoTakenAt } from '../lib/exif'
 
 export interface PhotoTag {
   user_id: string
@@ -20,6 +21,7 @@ export interface Photo {
   storage_path: string
   caption: string | null
   created_at: string
+  taken_at: string
   uploader: { display_name: string } | null
   activity: { id: string; name: string } | null
   tags: PhotoTag[]
@@ -53,7 +55,7 @@ export function newTagsSince(all: Photo[], userId: string, sinceIso: string): Ph
 }
 
 const SELECT = `
-  id, activity_id, user_id, storage_path, caption, created_at,
+  id, activity_id, user_id, storage_path, caption, created_at, taken_at,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
   tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name)),
@@ -128,6 +130,9 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   upload: async (file, userId, activityId) => {
     try {
+      // Must read EXIF from the original file — compression re-encodes the
+      // image through a canvas, which strips all metadata.
+      const takenAt = await getPhotoTakenAt(file)
       const compressed = await compressImage(file)
       const ext = 'jpg'
       const folder = activityId ?? 'album'
@@ -142,6 +147,9 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
         activity_id: activityId,
         user_id: userId,
         storage_path: path,
+        // No EXIF? Fall back to upload time, same as every photo did before
+        // this existed.
+        taken_at: (takenAt ?? new Date()).toISOString(),
       })
       if (insertError) return { error: insertError.message }
 

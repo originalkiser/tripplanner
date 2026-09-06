@@ -160,6 +160,7 @@ export interface Database {
           storage_path: string
           caption: string | null
           created_at: string
+          taken_at: string
         }
         Insert: {
           id?: string
@@ -168,6 +169,7 @@ export interface Database {
           storage_path: string
           caption?: string | null
           created_at?: string
+          taken_at?: string
         }
         Update: Partial<Database['trip']['Tables']['activity_photos']['Insert']>
         Relationships: []
