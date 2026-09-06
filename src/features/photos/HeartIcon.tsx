@@ -9,7 +9,7 @@ export function HeartIcon({ filled, className }: { filled: boolean; className?: 
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="M12 21s-7.5-4.6-10-9.3C.6 8.4 2.2 5 5.6 5c2 0 3.4 1 4.4 2.4C11 6 12.4 5 14.4 5c3.4 0 5 3.4 3.6 6.7C19.5 16.4 12 21 12 21Z" />
+      <path d="M12 21.35 10.55 20.03C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54Z" />
     </svg>
   )
 }
