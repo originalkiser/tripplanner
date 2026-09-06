@@ -105,6 +105,7 @@ interface ActivitiesState {
   leaveActivity: (activityId: string, userId: string) => Promise<{ error: string | null }>
   adoptProposedTime: (activityId: string, date: string, time: string) => Promise<{ error: string | null }>
   inviteParticipants: (activityId: string, userIds: string[]) => Promise<{ error: string | null }>
+  tagParticipants: (activityId: string, userIds: string[]) => Promise<{ error: string | null }>
   respondToInvite: (activityId: string, userId: string, accept: boolean) => Promise<{ error: string | null }>
   deleteActivity: (activityId: string) => Promise<{ error: string | null }>
 }
@@ -274,6 +275,21 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
     const { error } = await supabase.from('activity_participants').upsert(
       userIds.map((userId) => ({ activity_id: activityId, user_id: userId, status: 'invited' })),
       { onConflict: 'activity_id,user_id', ignoreDuplicates: true },
+    )
+    if (error) return { error: error.message }
+    await get().fetchActivities()
+    return { error: null }
+  },
+
+  // A logged visit already happened, so there's nothing to accept or
+  // decline — tagging someone records that they were there directly
+  // (status 'joined'), skipping the pending-invite flow that only makes
+  // sense for something still upcoming.
+  tagParticipants: async (activityId, userIds) => {
+    if (userIds.length === 0) return { error: null }
+    const { error } = await supabase.from('activity_participants').upsert(
+      userIds.map((userId) => ({ activity_id: activityId, user_id: userId, status: 'joined' })),
+      { onConflict: 'activity_id,user_id' },
     )
     if (error) return { error: error.message }
     await get().fetchActivities()
