@@ -367,7 +367,8 @@ h4 {
   .sun-loader-rays,
   .sun-loader-core,
   .photo-slide-in-right,
-  .photo-slide-in-left {
+  .photo-slide-in-left,
+  .heart-burst {
     animation: none !important;
   }
 }
@@ -400,6 +401,28 @@ h4 {
 }
 .photo-slide-in-left {
   animation: photo-slide-in-left 220ms ease-out;
+}
+
+/* Double-tap-to-like heart burst — pops in, holds briefly, fades out. */
+@keyframes heart-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  30% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.heart-burst {
+  animation: heart-burst 700ms ease-out forwards;
 }
 
 /* Leaflet dark mode — there's still only the one free OSM raster tile

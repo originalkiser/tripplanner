@@ -1,21 +1,24 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { usePhotosStore, type Photo } from '../../stores/photosStore'
+import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { useAuthStore } from '../../stores/authStore'
 import { tripPhotoUrl } from '../../lib/storage'
 import { downloadPhoto } from '../../lib/downloadPhotos'
+import { HeartIcon } from './HeartIcon'
 
 const SWIPE_THRESHOLD_PX = 50
+const HEART_BURST_MS = 700
 
 export function PhotoGallery({ activityId, photos }: { activityId: string | null; photos: Photo[] }) {
   const profile = useAuthStore((s) => s.profile)
-  const { upload, remove } = usePhotosStore()
+  const { upload, remove, toggleLike } = usePhotosStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [slideDir, setSlideDir] = useState<'left' | 'right' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [burstId, setBurstId] = useState<string | null>(null)
   const touchStartX = useRef<number | null>(null)
   const isPinching = useRef(false)
 
@@ -95,6 +98,21 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
       await downloadPhoto(photo)
     } finally {
       setDownloading(false)
+    }
+  }
+
+  function handleLikeToggle(photo: Photo) {
+    if (!profile) return
+    void toggleLike(photo, profile.id, hasLiked(photo, profile.id))
+  }
+
+  // Double-tap always likes (never unlikes) and always plays the heart
+  // burst, even if already liked — matches the familiar Instagram gesture.
+  function triggerLikeBurst(photo: Photo) {
+    setBurstId(photo.id)
+    setTimeout(() => setBurstId((id) => (id === photo.id ? null : id)), HEART_BURST_MS)
+    if (profile && !hasLiked(photo, profile.id)) {
+      void toggleLike(photo, profile.id, false)
     }
   }
 
@@ -180,16 +198,33 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
               key={lightbox.id}
               src={tripPhotoUrl(lightbox.storage_path)}
               alt=""
-              className={`max-h-[96dvh] max-w-full object-contain ${
+              className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
                 slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
               }`}
               onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                triggerLikeBurst(lightbox)
+              }}
             />
+            {burstId === lightbox.id && (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <HeartIcon filled className="heart-burst h-28 w-28 drop-shadow-lg" />
+              </span>
+            )}
             <div
               className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
               onClick={(e) => e.stopPropagation()}
             >
               <span>{lightbox.uploader?.display_name}</span>
+              <button
+                type="button"
+                onClick={() => handleLikeToggle(lightbox)}
+                className="flex items-center gap-1"
+              >
+                <HeartIcon filled={!!profile && hasLiked(lightbox, profile.id)} className="h-5 w-5" />
+                {lightbox.likes.length > 0 && <span className="font-data text-xs">{lightbox.likes.length}</span>}
+              </button>
               <button
                 type="button"
                 disabled={downloading}
