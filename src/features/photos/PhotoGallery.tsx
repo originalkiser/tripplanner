@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { useAuthStore } from '../../stores/authStore'
-import { tripPhotoUrl } from '../../lib/storage'
+import { tripPhotoUrl, isVideoPath } from '../../lib/storage'
 import { downloadPhoto } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 
@@ -129,9 +129,18 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
               setSlideDir(null)
               setLightboxIndex(i)
             }}
-            className="aspect-square overflow-hidden rounded-lg bg-secondary/10"
+            className="relative aspect-square overflow-hidden rounded-lg bg-secondary/10"
           >
-            <img src={tripPhotoUrl(p.storage_path)} alt="" className="h-full w-full object-cover" />
+            {isVideoPath(p.storage_path) ? (
+              <video src={tripPhotoUrl(p.storage_path)} muted playsInline className="h-full w-full object-cover" />
+            ) : (
+              <img src={tripPhotoUrl(p.storage_path)} alt="" className="h-full w-full object-cover" />
+            )}
+            {isVideoPath(p.storage_path) && (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl text-white drop-shadow">
+                ▶
+              </span>
+            )}
           </button>
         ))}
         <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-line text-2xl text-secondary/50">
@@ -139,7 +148,7 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             multiple
             onChange={(e) => void handleFile(e)}
             className="hidden"
@@ -194,19 +203,36 @@ export function PhotoGallery({ activityId, photos }: { activityId: string | null
                 &#8250;
               </button>
             )}
-            <img
-              key={lightbox.id}
-              src={tripPhotoUrl(lightbox.storage_path)}
-              alt=""
-              className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
-                slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
-              }`}
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => {
-                e.stopPropagation()
-                triggerLikeBurst(lightbox)
-              }}
-            />
+            {isVideoPath(lightbox.storage_path) ? (
+              <video
+                key={lightbox.id}
+                src={tripPhotoUrl(lightbox.storage_path)}
+                controls
+                playsInline
+                className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
+                  slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+                }`}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  triggerLikeBurst(lightbox)
+                }}
+              />
+            ) : (
+              <img
+                key={lightbox.id}
+                src={tripPhotoUrl(lightbox.storage_path)}
+                alt=""
+                className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
+                  slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+                }`}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  triggerLikeBurst(lightbox)
+                }}
+              />
+            )}
             {burstId === lightbox.id && (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <HeartIcon filled className="heart-burst h-28 w-28 drop-shadow-lg" />

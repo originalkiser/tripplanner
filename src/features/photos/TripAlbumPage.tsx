@@ -5,7 +5,7 @@ import { usePhotoSeenStore } from '../../stores/photoSeenStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
-import { tripPhotoUrl } from '../../lib/storage'
+import { tripPhotoUrl, isVideoPath } from '../../lib/storage'
 import { searchLocations, reverseGeocode, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
@@ -219,6 +219,43 @@ export function TripAlbumPage() {
     }, 400)
   }
 
+  // One entry per distinct name already used on some photo, newest first —
+  // lets tagging a run of photos from the same spot skip typing/searching
+  // after the first one.
+  const recentLocations = (() => {
+    const byName = new Map<string, { name: string; lat: number | null; lng: number | null; lastUsed: string }>()
+    for (const p of all) {
+      if (!p.location_name) continue
+      const existing = byName.get(p.location_name)
+      if (!existing || p.taken_at > existing.lastUsed) {
+        byName.set(p.location_name, {
+          name: p.location_name,
+          lat: p.location_lat,
+          lng: p.location_lng,
+          lastUsed: p.taken_at,
+        })
+      }
+    }
+    return [...byName.values()].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed))
+  })()
+
+  function matchingRecentLocations(query: string) {
+    const q = query.trim().toLowerCase()
+    const matches = q ? recentLocations.filter((r) => r.name.toLowerCase().includes(q)) : recentLocations
+    return matches.slice(0, 5)
+  }
+
+  async function pickRecentLocation(
+    photo: Photo,
+    recent: { name: string; lat: number | null; lng: number | null },
+  ) {
+    setSavingLocation(true)
+    await setPhotoLocation(photo, { name: recent.name, lat: recent.lat, lng: recent.lng })
+    setSavingLocation(false)
+    setEditingLocationId(null)
+    setLocationResults([])
+  }
+
   // Picking a suggestion sets real coordinates; just typing a name and
   // saving keeps whatever coordinates the photo already had (renaming, not
   // moving it) — or none, for a purely descriptive tag like "our Airbnb".
@@ -336,7 +373,7 @@ export function TripAlbumPage() {
       <div className="flex items-start justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
-          <p className="mt-1 text-sm text-text-dim">Every photo from the trip, in time order.</p>
+          <p className="mt-1 text-sm text-text-dim">Every photo and video from the trip, in time order.</p>
         </div>
         {all.length > 0 && (
           <button
@@ -427,7 +464,16 @@ export function TripAlbumPage() {
               className="card-shadow relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border-2 border-surface bg-surface"
               style={{ marginLeft: i === 0 ? 0 : -28, zIndex: i, transform: `rotate(${(i % 2 === 0 ? -1 : 1) * 4}deg)` }}
             >
-              <img src={tripPhotoUrl(photo.storage_path)} alt="" className="h-full w-full object-cover" />
+              {isVideoPath(photo.storage_path) ? (
+                <video src={tripPhotoUrl(photo.storage_path)} muted playsInline className="h-full w-full object-cover" />
+              ) : (
+                <img src={tripPhotoUrl(photo.storage_path)} alt="" className="h-full w-full object-cover" />
+              )}
+              {isVideoPath(photo.storage_path) && (
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-xl text-white drop-shadow">
+                  ▶
+                </span>
+              )}
               {selectMode && (
                 <span
                   className={`absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-[11px] text-white ${
@@ -444,7 +490,7 @@ export function TripAlbumPage() {
 
       {loading && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
       {!loading && all.length === 0 && (
-        <p className="mt-8 text-center text-sm text-text-dim">No photos yet — add the first one below.</p>
+        <p className="mt-8 text-center text-sm text-text-dim">No photos or videos yet — add the first one below.</p>
       )}
 
       <div className="mt-4 flex flex-col gap-4">
@@ -457,7 +503,21 @@ export function TripAlbumPage() {
                 onClick={() => (selectMode ? toggleSelected(photo.id) : handlePhotoTap(i))}
                 className="relative block w-full touch-manipulation"
               >
-                <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
+                {isVideoPath(photo.storage_path) ? (
+                  <video
+                    src={tripPhotoUrl(photo.storage_path)}
+                    muted
+                    playsInline
+                    className="max-h-96 w-full object-cover"
+                  />
+                ) : (
+                  <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
+                )}
+                {isVideoPath(photo.storage_path) && (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-4xl text-white drop-shadow">
+                    ▶
+                  </span>
+                )}
                 {selectMode && (
                   <span
                     className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-sm text-white ${
@@ -523,8 +583,19 @@ export function TripAlbumPage() {
                       {locatingSelf ? 'Finding you…' : '📍 Use my location'}
                     </button>
                     {locationError && <p className="mt-1 text-xs text-red-600">{locationError}</p>}
-                    {locationResults.length > 0 && (
+                    {(matchingRecentLocations(locationQuery).length > 0 || locationResults.length > 0) && (
                       <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+                        {matchingRecentLocations(locationQuery).map((r) => (
+                          <li key={`recent-${r.name}`}>
+                            <button
+                              type="button"
+                              onClick={() => void pickRecentLocation(photo, r)}
+                              className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs hover:bg-bg"
+                            >
+                              <span className="text-text-dim">↻</span> {r.name}
+                            </button>
+                          </li>
+                        ))}
                         {locationResults.map((r) => (
                           <li key={r.placeId}>
                             <button
@@ -645,11 +716,11 @@ export function TripAlbumPage() {
           </div>
         ) : (
           <label className="card-shadow flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line bg-surface py-3 text-sm font-medium text-primary">
-            {uploading ? 'Uploading…' : '+ Add a photo'}
+            {uploading ? 'Uploading…' : '+ Add a photo or video'}
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               multiple
               onChange={(e) => void handleUpload(e)}
               className="hidden"
@@ -703,19 +774,36 @@ export function TripAlbumPage() {
                 &#8250;
               </button>
             )}
-            <img
-              key={lightbox.id}
-              src={tripPhotoUrl(lightbox.storage_path)}
-              alt=""
-              className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
-                slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
-              }`}
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => {
-                e.stopPropagation()
-                triggerLikeBurst(lightbox)
-              }}
-            />
+            {isVideoPath(lightbox.storage_path) ? (
+              <video
+                key={lightbox.id}
+                src={tripPhotoUrl(lightbox.storage_path)}
+                controls
+                playsInline
+                className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
+                  slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+                }`}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  triggerLikeBurst(lightbox)
+                }}
+              />
+            ) : (
+              <img
+                key={lightbox.id}
+                src={tripPhotoUrl(lightbox.storage_path)}
+                alt=""
+                className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
+                  slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
+                }`}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  triggerLikeBurst(lightbox)
+                }}
+              />
+            )}
             {burstId === lightbox.id && (
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
                 <HeartIcon filled className="heart-burst h-28 w-28 drop-shadow-lg" />

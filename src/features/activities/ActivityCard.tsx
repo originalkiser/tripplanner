@@ -577,7 +577,7 @@ export function ActivityCard({
           )}
 
           <div>
-            <p className="mb-1 text-xs font-medium text-text-dim">Photos</p>
+            <p className="mb-1 text-xs font-medium text-text-dim">Photos & Videos</p>
             <PhotoGallery activityId={activity.id} photos={photos} />
           </div>
 
