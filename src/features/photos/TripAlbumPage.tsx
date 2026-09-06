@@ -15,7 +15,7 @@ type Member = Database['trip']['Tables']['user_profiles']['Row']
 const SWIPE_THRESHOLD_PX = 50
 const DOUBLE_TAP_MS = 300
 const SINGLE_TAP_DELAY_MS = 250
-const HEART_BURST_MS = 700
+const HEART_BURST_MS = 1400
 
 function formatTaken(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -23,6 +23,18 @@ function formatTaken(iso: string): string {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+  })
+}
+
+function dayKeyOf(iso: string): string {
+  return iso.slice(0, 10)
+}
+
+function formatDayLabel(dayKey: string): string {
+  return new Date(`${dayKey}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   })
 }
 
@@ -221,6 +233,36 @@ export function TripAlbumPage() {
     }
   }
 
+  // Quick export filters: jump straight into select mode with the matching
+  // photos already checked, rather than making people tap "Select" first
+  // and then pick photos out one at a time.
+  function selectFiltered(predicate: (photo: Photo) => boolean) {
+    setSelectMode(true)
+    setSelectedIds(new Set(all.filter(predicate).map((p) => p.id)))
+  }
+
+  function selectLiked() {
+    if (!profile) return
+    selectFiltered((p) => hasLiked(p, profile.id))
+  }
+
+  function selectTagged() {
+    if (!profile) return
+    selectFiltered((p) => p.tags.some((t) => t.user_id === profile.id))
+  }
+
+  function selectByActivity(activityId: string) {
+    if (!activityId) return
+    selectFiltered((p) => p.activity_id === activityId)
+  }
+
+  function selectByDay(dayKey: string) {
+    if (!dayKey) return
+    selectFiltered((p) => dayKeyOf(p.created_at) === dayKey)
+  }
+
+  const uniqueDays = Array.from(new Set(all.map((p) => dayKeyOf(p.created_at)))).sort()
+
   return (
     <div className="mx-auto max-w-md p-4 pb-32">
       <div className="flex items-start justify-between gap-2">
@@ -240,7 +282,59 @@ export function TripAlbumPage() {
       </div>
 
       {all.length > 0 && (
-        <div className="mt-4 -mx-4 flex gap-0 overflow-x-auto px-6 py-3">
+        <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
+          <span className="shrink-0 text-xs font-medium text-text-dim">Quick export:</span>
+          <button
+            type="button"
+            onClick={selectLiked}
+            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+          >
+            ❤ Liked
+          </button>
+          <button
+            type="button"
+            onClick={selectTagged}
+            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+          >
+            🏷 Tagged
+          </button>
+          {activities.length > 0 && (
+            <select
+              value=""
+              onChange={(e) => selectByActivity(e.target.value)}
+              className="shrink-0 rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+            >
+              <option value="" disabled>
+                By event…
+              </option>
+              {activities.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {uniqueDays.length > 1 && (
+            <select
+              value=""
+              onChange={(e) => selectByDay(e.target.value)}
+              className="shrink-0 rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+            >
+              <option value="" disabled>
+                By day…
+              </option>
+              {uniqueDays.map((d) => (
+                <option key={d} value={d}>
+                  {formatDayLabel(d)}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
+      {all.length > 0 && (
+        <div className="mt-2 -mx-4 flex gap-0 overflow-x-auto px-6 py-3">
           {all.map((photo, i) => (
             <button
               key={photo.id}
