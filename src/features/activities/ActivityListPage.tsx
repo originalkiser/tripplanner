@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useWeatherStore } from '../../stores/weatherStore'
@@ -10,6 +10,10 @@ import { TodayWeather } from './TodayWeather'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon } from '../../lib/weather'
 import type { ActivityType } from '../../types/database'
+
+const CreateActivityModal = lazy(() =>
+  import('./CreateActivityModal').then((m) => ({ default: m.CreateActivityModal })),
+)
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
@@ -24,6 +28,7 @@ export function ActivityListPage() {
   const [showImported, setShowImported] = useState(true)
   const [searchParams] = useSearchParams()
   const highlightId = searchParams.get('activity')
+  const [logging, setLogging] = useState(false)
 
   useEffect(() => {
     void fetchActivities()
@@ -36,22 +41,30 @@ export function ActivityListPage() {
     })
   }, [activities, typeFilter])
 
-  const byDay = (date: string) => filtered.filter((a) => a.proposed_date === date)
+  // Logged-after-the-fact visits are trip history, not something to plan
+  // around — kept out of the day-by-day/needs-scheduling/unplanned buckets
+  // below and shown in their own "Visited" section instead.
+  const planningActivities = filtered.filter((a) => a.source !== 'logged')
+  const loggedEntries = [...filtered.filter((a) => a.source === 'logged')].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )
+
+  const byDay = (date: string) => planningActivities.filter((a) => a.proposed_date === date)
   const plannedCount = TRIP_DAYS.reduce((sum, d) => sum + byDay(d.date).length, 0)
   const today = todayIso()
 
-  const hasEngagement = (a: (typeof filtered)[number]) =>
+  const hasEngagement = (a: (typeof planningActivities)[number]) =>
     a.participants.some((p) => p.status === 'joined' || p.status === 'proposed_alt_time')
 
   // Still unplanned, but someone's already joined or suggested a day/time
   // for it — surfaced here since it's no longer just an idea.
-  const needsScheduling = filtered.filter((a) => !a.proposed_date && hasEngagement(a))
+  const needsScheduling = planningActivities.filter((a) => !a.proposed_date && hasEngagement(a))
 
   // Everything else unplanned — no day, and nobody's engaged with it yet.
   // Plans and Unplanned used to be separate tabs; this is that tab's content
   // folded into its own section here instead, split the same way it always
   // was (bulk-imported ideas collapsed by default, everything else open).
-  const unplanned = filtered.filter((a) => !a.proposed_date && !hasEngagement(a))
+  const unplanned = planningActivities.filter((a) => !a.proposed_date && !hasEngagement(a))
   const importedIdeas = unplanned.filter((a) => a.source === 'imported_note')
   const otherIdeas = unplanned.filter((a) => a.source !== 'imported_note')
 
@@ -99,10 +112,37 @@ export function ActivityListPage() {
           <DigestBanner onSelectActivity={setQuickViewId} />
         </div>
 
+        <section className="mt-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
+              Visited {loggedEntries.length > 0 && `(${loggedEntries.length})`}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setLogging(true)}
+              className="shrink-0 rounded-full bg-coral px-3 py-1.5 text-xs font-medium text-white"
+            >
+              + Log a visit
+            </button>
+          </div>
+          {loggedEntries.length === 0 ? (
+            <p className="mt-2 text-xs text-text-dim">
+              Places you've been and things you've done — log them here as you go, no planning
+              required.
+            </p>
+          ) : (
+            <div className="mt-2 grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {loggedEntries.map((a) => (
+                <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+              ))}
+            </div>
+          )}
+        </section>
+
         {loading && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
 
         {view === 'calendar' ? (
-          <PlannedCalendarView activities={filtered} onSelect={setQuickViewId} />
+          <PlannedCalendarView activities={planningActivities} onSelect={setQuickViewId} />
         ) : (
           <>
             {TRIP_DAYS.map((day) => {
@@ -130,11 +170,15 @@ export function ActivityListPage() {
               )
             })}
 
-            {!loading && plannedCount === 0 && needsScheduling.length === 0 && unplanned.length === 0 && (
-              <p className="mt-8 text-center text-sm text-text-dim">
-                Nothing here yet — add something new to get started.
-              </p>
-            )}
+            {!loading &&
+              plannedCount === 0 &&
+              needsScheduling.length === 0 &&
+              unplanned.length === 0 &&
+              loggedEntries.length === 0 && (
+                <p className="mt-8 text-center text-sm text-text-dim">
+                  Nothing here yet — add something new to get started.
+                </p>
+              )}
 
             {needsScheduling.length > 0 && (
               <section className="mt-4">
@@ -194,6 +238,12 @@ export function ActivityListPage() {
       </div>
 
       {quickViewId && <ActivityQuickView activityId={quickViewId} onClose={() => setQuickViewId(null)} />}
+
+      {logging && (
+        <Suspense fallback={null}>
+          <CreateActivityModal logMode onClose={() => setLogging(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }

@@ -41,6 +41,26 @@ export async function searchLocations(query: string): Promise<LocationResult[]> 
   }))
 }
 
+// Best-effort place name for a coordinate pair (e.g. a photo's EXIF GPS) —
+// null on any failure, since this is always just a suggestion the caller
+// can fall back past or let someone overwrite.
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    const url = new URL('https://nominatim.openstreetmap.org/reverse')
+    url.searchParams.set('format', 'json')
+    url.searchParams.set('lat', String(lat))
+    url.searchParams.set('lon', String(lng))
+    url.searchParams.set('zoom', '18')
+
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const result: { display_name?: string; name?: string } = await res.json()
+    return result.name || result.display_name || null
+  } catch {
+    return null
+  }
+}
+
 export function googleMapsUrl(lat: number, lng: number): string {
   return `https://maps.google.com/?q=${lat},${lng}`
 }

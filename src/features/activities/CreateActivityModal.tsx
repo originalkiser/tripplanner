@@ -38,6 +38,18 @@ const RATING_LABELS: Record<number, string> = {
   5: 'Have to do this',
 }
 
+const LOGGED_RATING_LABELS: Record<number, string> = {
+  1: 'Meh',
+  2: 'It was fine',
+  3: 'Pretty good',
+  4: 'Really good',
+  5: 'Amazing',
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 interface PollOptionDraft {
   date: string
   time: string
@@ -47,9 +59,15 @@ let searchTimer: ReturnType<typeof setTimeout> | undefined
 
 export function CreateActivityModal({
   activity,
+  logMode,
   onClose,
 }: {
   activity?: Activity
+  // "Log a visit" — a fast, minimal path for recording something already
+  // done rather than planning something ahead: dated today by default, no
+  // poll/unscheduled toggle, saved with source 'logged' instead of
+  // 'user_added'. Only meaningful when creating (activity is unset).
+  logMode?: boolean
   onClose: () => void
 }) {
   const profile = useAuthStore((s) => s.profile)
@@ -83,7 +101,7 @@ export function CreateActivityModal({
 
   const [type, setType] = useState<ActivityType>(activity?.type ?? 'activity')
   const [name, setName] = useState(activity?.name ?? '')
-  const [date, setDate] = useState(activity?.proposed_date ?? '')
+  const [date, setDate] = useState(activity?.proposed_date ?? (logMode ? todayIso() : ''))
   const [time, setTime] = useState(activity?.proposed_time?.slice(0, 5) ?? '')
   const [duration, setDuration] = useState(
     activity?.duration_minutes != null ? String(activity.duration_minutes) : '',
@@ -201,7 +219,7 @@ export function CreateActivityModal({
 
     const { error, activityId } = await createActivity({
       ...fields,
-      source: 'user_added',
+      source: logMode ? 'logged' : 'user_added',
       createdBy: profile.id,
       initialRating: rating,
     })
@@ -248,7 +266,7 @@ export function CreateActivityModal({
       <div className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface">
         <div className="flex items-center justify-between border-b border-line p-4">
           <h2 className="text-xl font-semibold text-primary">
-            {isEdit ? 'Edit Activity' : 'New Activity'}
+            {isEdit ? 'Edit Activity' : logMode ? 'Log a Visit' : 'New Activity'}
           </h2>
           <button type="button" onClick={onClose} className="text-2xl leading-none opacity-60">
             &times;
@@ -301,17 +319,19 @@ export function CreateActivityModal({
           </div>
           {linkStatus && <p className="-mt-2 text-xs text-text-dim">{linkStatus}</p>}
 
-          <div className="flex items-center gap-2">
-            <input
-              id="unscheduled"
-              type="checkbox"
-              checked={unscheduled}
-              onChange={(e) => setUnscheduled(e.target.checked)}
-            />
-            <label htmlFor="unscheduled" className="text-sm">
-              Unscheduled (no specific day yet)
-            </label>
-          </div>
+          {!logMode && (
+            <div className="flex items-center gap-2">
+              <input
+                id="unscheduled"
+                type="checkbox"
+                checked={unscheduled}
+                onChange={(e) => setUnscheduled(e.target.checked)}
+              />
+              <label htmlFor="unscheduled" className="text-sm">
+                Unscheduled (no specific day yet)
+              </label>
+            </div>
+          )}
 
           {!unscheduled && (
             <div className="flex flex-col gap-2">
@@ -344,7 +364,7 @@ export function CreateActivityModal({
             </div>
           )}
 
-          {!isEdit && (
+          {!isEdit && !logMode && (
             <div className="rounded-lg bg-secondary/10 p-3">
               <div className="flex items-center gap-2">
                 <input
@@ -400,7 +420,7 @@ export function CreateActivityModal({
             </div>
           )}
 
-          {inviteCandidates.length > 0 && (
+          {!logMode && inviteCandidates.length > 0 && (
             <div className="rounded-lg bg-secondary/10 p-3">
               <p className="text-sm font-medium">Request others to join</p>
               <p className="mt-0.5 text-xs text-text-dim">
@@ -457,14 +477,14 @@ export function CreateActivityModal({
 
           {!isEdit && (
             <div>
-              <p className="mb-1 text-sm font-medium">How excited are you?</p>
+              <p className="mb-1 text-sm font-medium">{logMode ? 'How was it?' : 'How excited are you?'}</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setRating(n)}
-                    title={RATING_LABELS[n]}
+                    title={logMode ? LOGGED_RATING_LABELS[n] : RATING_LABELS[n]}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium ${
                       rating === n ? 'bg-accent text-white' : 'bg-bg text-text'
                     }`}
@@ -473,7 +493,11 @@ export function CreateActivityModal({
                   </button>
                 ))}
               </div>
-              {rating && <p className="mt-1 text-xs text-text-dim">{RATING_LABELS[rating]}</p>}
+              {rating && (
+                <p className="mt-1 text-xs text-text-dim">
+                  {logMode ? LOGGED_RATING_LABELS[rating] : RATING_LABELS[rating]}
+                </p>
+              )}
             </div>
           )}
 
@@ -484,7 +508,7 @@ export function CreateActivityModal({
             disabled={saving}
             className="rounded-xl bg-primary px-4 py-3 font-medium text-white disabled:opacity-50"
           >
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add Activity'}
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : logMode ? 'Log Visit' : 'Add Activity'}
           </button>
         </form>
       </div>

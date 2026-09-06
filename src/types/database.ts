@@ -3,7 +3,7 @@
 
 export type ActivityType = 'food' | 'activity' | 'food_and_activity'
 export type ActivityCategory = 'savannah' | 'tybee'
-export type ActivitySource = 'user_added' | 'imported_note'
+export type ActivitySource = 'user_added' | 'imported_note' | 'logged'
 export type ParticipantStatus = 'joined' | 'proposed_alt_time' | 'invited'
 export type PackingListKind = 'trip' | 'private'
 export type WifiSecurity = 'WPA' | 'WEP' | 'nopass'
@@ -160,6 +160,10 @@ export interface Database {
           storage_path: string
           caption: string | null
           created_at: string
+          taken_at: string
+          location_name: string | null
+          location_lat: number | null
+          location_lng: number | null
         }
         Insert: {
           id?: string
@@ -168,6 +172,10 @@ export interface Database {
           storage_path: string
           caption?: string | null
           created_at?: string
+          taken_at?: string
+          location_name?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
         }
         Update: Partial<Database['trip']['Tables']['activity_photos']['Insert']>
         Relationships: []

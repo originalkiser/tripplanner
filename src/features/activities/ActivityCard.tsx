@@ -86,8 +86,15 @@ export function ActivityCard({
   scheduleCallout?: boolean
 }) {
   const profile = useAuthStore((s) => s.profile)
-  const { joinActivity, proposeAltTime, rateActivity, leaveActivity, adoptProposedTime, inviteParticipants } =
-    useActivitiesStore()
+  const {
+    joinActivity,
+    proposeAltTime,
+    rateActivity,
+    leaveActivity,
+    adoptProposedTime,
+    inviteParticipants,
+    deleteActivity,
+  } = useActivitiesStore()
 
   const [expanded, setExpanded] = useState(false)
   const [proposing, setProposing] = useState(false)
@@ -159,6 +166,14 @@ export function ActivityCard({
   const unmatchedProposals = proposedAlts.filter((p) => !isApplied(p))
   const usedProposal = activity.proposed_date ? proposedAlts.find(isApplied) : undefined
   const canEdit = !!profile
+  // A logged-after-the-fact visit has no plannable future — joining,
+  // inviting, and proposing a different time for something that already
+  // happened don't make sense.
+  const isLogged = activity.source === 'logged'
+  // No general activity-delete exists (planned activities are shared trip
+  // history once other people engage with them) — scoped to the creator or
+  // an admin removing their own mistaken log entry.
+  const canDeleteLogged = isLogged && !!profile && (activity.created_by === profile.id || profile.is_admin)
 
   const alreadyParticipating = new Set(activity.participants.map((p) => p.user_id))
   const inviteCandidates = members.filter((m) => m.id !== profile?.id && !alreadyParticipating.has(m.id))
@@ -219,6 +234,13 @@ export function ActivityCard({
     if (!profile) return
     setBusy(true)
     await rateActivity(activity.id, profile.id, n)
+    setBusy(false)
+  }
+
+  async function handleDelete() {
+    if (!confirm('Delete this logged visit?')) return
+    setBusy(true)
+    await deleteActivity(activity.id)
     setBusy(false)
   }
 
@@ -323,16 +345,18 @@ export function ActivityCard({
             />
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setExpanded(true)
-            setShowInvite(true)
-          }}
-          className="shrink-0 rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
-        >
-          + Invite more
-        </button>
+        {!isLogged && (
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded(true)
+              setShowInvite(true)
+            }}
+            className="shrink-0 rounded-full bg-bg px-3 py-1 text-xs font-medium text-primary"
+          >
+            + Invite more
+          </button>
+        )}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -368,7 +392,7 @@ export function ActivityCard({
             View link
           </a>
         )}
-        {!mine && (
+        {!mine && !isLogged && (
           <button
             type="button"
             onClick={() => void handleJoin()}
@@ -382,50 +406,51 @@ export function ActivityCard({
 
       {expanded && (
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
-          {showInvite ? (
-            <div className="rounded-lg bg-secondary/10 p-3">
-              <p className="mb-2 text-sm font-medium">Invite others</p>
-              {inviteCandidates.length === 0 ? (
-                <p className="text-xs text-text-dim">Everyone's already in or invited.</p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {inviteCandidates.map((m) => (
-                    <label key={m.id} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={inviteIds.has(m.id)} onChange={() => toggleInvite(m.id)} />
-                      {m.display_name}
-                    </label>
-                  ))}
-                </div>
-              )}
-              <div className="mt-3 flex gap-2">
-                {inviteCandidates.length > 0 && (
+          {!isLogged &&
+            (showInvite ? (
+              <div className="rounded-lg bg-secondary/10 p-3">
+                <p className="mb-2 text-sm font-medium">Invite others</p>
+                {inviteCandidates.length === 0 ? (
+                  <p className="text-xs text-text-dim">Everyone's already in or invited.</p>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {inviteCandidates.map((m) => (
+                      <label key={m.id} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={inviteIds.has(m.id)} onChange={() => toggleInvite(m.id)} />
+                        {m.display_name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-3 flex gap-2">
+                  {inviteCandidates.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void sendInvites()}
+                      disabled={busy || inviteIds.size === 0}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      Send invites
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => void sendInvites()}
-                    disabled={busy || inviteIds.size === 0}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    onClick={() => setShowInvite(false)}
+                    className="rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
                   >
-                    Send invites
+                    Cancel
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowInvite(false)}
-                  className="rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
-                >
-                  Cancel
-                </button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowInvite(true)}
-              className="self-start rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
-            >
-              Invite others
-            </button>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowInvite(true)}
+                className="self-start rounded-lg bg-bg px-3 py-1.5 text-sm font-medium"
+              >
+                Invite others
+              </button>
+            ))}
 
           {usedProposal && (
             <div className="inline-block self-start rounded-lg bg-accent/15 px-2 py-1 text-xs font-medium text-accent">
@@ -437,39 +462,53 @@ export function ActivityCard({
 
           {activity.location_name && <p className="text-sm text-text-dim">{activity.location_name}</p>}
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={openProposeForm}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
-                scheduleCallout && !activity.proposed_date && !earliestProposal
-                  ? 'bg-coral text-white'
-                  : 'bg-bg'
-              }`}
-            >
-              {activity.proposed_date ? 'Propose new time' : 'Propose time'}
-            </button>
-            {mine && (
+          {!isLogged && (
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => void handleLeave()}
-                disabled={busy}
-                className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-50"
+                onClick={openProposeForm}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                  scheduleCallout && !activity.proposed_date && !earliestProposal
+                    ? 'bg-coral text-white'
+                    : 'bg-bg'
+                }`}
               >
-                Leave
+                {activity.proposed_date ? 'Propose new time' : 'Propose time'}
+              </button>
+              {mine && (
+                <button
+                  type="button"
+                  onClick={() => void handleLeave()}
+                  disabled={busy}
+                  className="rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-50"
+                >
+                  Leave
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setShowEdit(true)}
+                className="self-start rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
+              >
+                Edit
+              </button>
+            )}
+            {canDeleteLogged && (
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={busy}
+                className="self-start rounded-full bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 disabled:opacity-50"
+              >
+                Delete
               </button>
             )}
           </div>
-
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setShowEdit(true)}
-              className="self-start rounded-full bg-bg px-3 py-1.5 text-sm font-medium text-primary"
-            >
-              Edit
-            </button>
-          )}
 
           {poll && <PollSection poll={poll} />}
 

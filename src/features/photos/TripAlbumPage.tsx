@@ -6,11 +6,13 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl } from '../../lib/storage'
+import { searchLocations, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
+type SortMode = 'uploaded-asc' | 'uploaded-desc' | 'taken-asc' | 'taken-desc'
 
 const SWIPE_THRESHOLD_PX = 50
 const DOUBLE_TAP_MS = 300
@@ -40,7 +42,8 @@ function formatDayLabel(dayKey: string): string {
 
 export function TripAlbumPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike } = usePhotosStore()
+  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike, setPhotoLocation } =
+    usePhotosStore()
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
@@ -60,8 +63,20 @@ export function TripAlbumPage() {
   const [burstId, setBurstId] = useState<string | null>(null)
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTap = useRef<{ photoId: string; time: number } | null>(null)
+  const [sortMode, setSortMode] = useState<SortMode>('uploaded-asc')
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+  const [locationQuery, setLocationQuery] = useState('')
+  const [locationResults, setLocationResults] = useState<LocationResult[]>([])
+  const [savingLocation, setSavingLocation] = useState(false)
+  const locationSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const lightbox = lightboxIndex != null ? all[lightboxIndex] : null
+  const sortField = sortMode.startsWith('taken') ? 'taken_at' : 'created_at'
+  const sortDir = sortMode.endsWith('asc') ? 1 : -1
+  const sorted = [...all].sort(
+    (a, b) => (new Date(a[sortField]).getTime() - new Date(b[sortField]).getTime()) * sortDir,
+  )
+
+  const lightbox = lightboxIndex != null ? sorted[lightboxIndex] : null
 
   useEffect(() => {
     void fetchAll()
@@ -106,7 +121,7 @@ export function TripAlbumPage() {
 
   function showNext() {
     setLightboxIndex((i) => {
-      if (i == null || i === all.length - 1) return i
+      if (i == null || i === sorted.length - 1) return i
       setSlideDir('right')
       return i + 1
     })
@@ -173,7 +188,7 @@ export function TripAlbumPage() {
   }
 
   function openPhoto(i: number) {
-    const photo = all[i]
+    const photo = sorted[i]
     if (selectMode) {
       toggleSelected(photo.id)
       return
@@ -185,6 +200,34 @@ export function TripAlbumPage() {
   function handleLikeToggle(photo: Photo) {
     if (!profile) return
     void toggleLike(photo, profile.id, hasLiked(photo, profile.id))
+  }
+
+  function startEditingLocation(photo: Photo) {
+    setEditingLocationId(photo.id)
+    setLocationQuery(photo.location_name ?? '')
+    setLocationResults([])
+  }
+
+  function onLocationInput(value: string) {
+    setLocationQuery(value)
+    if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current)
+    locationSearchTimer.current = setTimeout(async () => {
+      setLocationResults(await searchLocations(value))
+    }, 400)
+  }
+
+  // Picking a suggestion sets real coordinates; just typing a name and
+  // saving keeps whatever coordinates the photo already had (renaming, not
+  // moving it) — or none, for a purely descriptive tag like "our Airbnb".
+  async function saveLocation(photo: Photo, picked?: LocationResult) {
+    setSavingLocation(true)
+    const name = picked?.displayName ?? (locationQuery.trim() || null)
+    const lat = picked?.lat ?? (name ? photo.location_lat : null)
+    const lng = picked?.lng ?? (name ? photo.location_lng : null)
+    await setPhotoLocation(photo, { name, lat, lng })
+    setSavingLocation(false)
+    setEditingLocationId(null)
+    setLocationResults([])
   }
 
   // Double-tap always likes (never unlikes) and always plays the heart
@@ -201,7 +244,7 @@ export function TripAlbumPage() {
   // the same photo within DOUBLE_TAP_MS likes it instead. The single-tap
   // action is delayed just long enough to cancel it if a second tap lands.
   function handlePhotoTap(i: number) {
-    const photo = all[i]
+    const photo = sorted[i]
     const now = Date.now()
     const isDoubleTap = lastTap.current?.photoId === photo.id && now - lastTap.current.time < DOUBLE_TAP_MS
     lastTap.current = { photoId: photo.id, time: now }
@@ -281,6 +324,22 @@ export function TripAlbumPage() {
         )}
       </div>
 
+      {all.length > 1 && (
+        <div className="mt-3 flex items-center gap-2">
+          <span className="shrink-0 text-xs font-medium text-text-dim">Sort:</span>
+          <select
+            value={sortMode}
+            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            className="rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+          >
+            <option value="uploaded-asc">Upload time (oldest first)</option>
+            <option value="uploaded-desc">Upload time (newest first)</option>
+            <option value="taken-asc">Photo time (oldest first)</option>
+            <option value="taken-desc">Photo time (newest first)</option>
+          </select>
+        </div>
+      )}
+
       {all.length > 0 && (
         <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
           <span className="shrink-0 text-xs font-medium text-text-dim">Quick export:</span>
@@ -335,7 +394,7 @@ export function TripAlbumPage() {
 
       {all.length > 0 && (
         <div className="mt-2 -mx-4 flex gap-0 overflow-x-auto px-6 py-3">
-          {all.map((photo, i) => (
+          {sorted.map((photo, i) => (
             <button
               key={photo.id}
               type="button"
@@ -364,7 +423,7 @@ export function TripAlbumPage() {
       )}
 
       <div className="mt-4 flex flex-col gap-4">
-        {all.map((photo, i) => {
+        {sorted.map((photo, i) => {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
@@ -392,7 +451,7 @@ export function TripAlbumPage() {
               <div className="flex flex-col gap-2 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{photo.uploader?.display_name ?? 'Someone'}</span>
-                  <span className="font-data text-xs text-text-dim">{formatTaken(photo.created_at)}</span>
+                  <span className="font-data text-xs text-text-dim">{formatTaken(photo.taken_at)}</span>
                 </div>
 
                 <button
@@ -403,6 +462,58 @@ export function TripAlbumPage() {
                   <HeartIcon filled={!!profile && hasLiked(photo, profile.id)} className="h-5 w-5" />
                   {photo.likes.length > 0 && <span className="font-data text-xs">{photo.likes.length}</span>}
                 </button>
+
+                {editingLocationId === photo.id ? (
+                  <div className="relative">
+                    <div className="flex gap-1">
+                      <input
+                        autoFocus
+                        value={locationQuery}
+                        onChange={(e) => onLocationInput(e.target.value)}
+                        placeholder="Name this location"
+                        className="flex-1 rounded-lg border border-line bg-bg px-2 py-1 text-xs"
+                      />
+                      <button
+                        type="button"
+                        disabled={savingLocation}
+                        onClick={() => void saveLocation(photo)}
+                        className="shrink-0 rounded-lg bg-primary px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingLocationId(null)}
+                        className="shrink-0 rounded-lg bg-bg px-2 py-1 text-xs"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {locationResults.length > 0 && (
+                      <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
+                        {locationResults.map((r) => (
+                          <li key={r.placeId}>
+                            <button
+                              type="button"
+                              onClick={() => void saveLocation(photo, r)}
+                              className="block w-full px-2 py-1.5 text-left text-xs hover:bg-bg"
+                            >
+                              {r.displayName}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => startEditingLocation(photo)}
+                    className="flex items-center gap-1 self-start rounded-full bg-bg px-2 py-1 text-xs text-text-dim"
+                  >
+                    📍 {photo.location_name ?? 'Add location'}
+                  </button>
+                )}
 
                 <select
                   value={photo.activity_id ?? ''}
@@ -545,7 +656,7 @@ export function TripAlbumPage() {
                 &#8249;
               </button>
             )}
-            {lightboxIndex < all.length - 1 && (
+            {lightboxIndex < sorted.length - 1 && (
               <button
                 type="button"
                 onClick={(e) => {

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/imageCompression'
+import { getPhotoTakenAt, getPhotoLocation } from '../lib/exif'
+import { reverseGeocode } from '../lib/geo'
 
 export interface PhotoTag {
   user_id: string
@@ -20,6 +22,10 @@ export interface Photo {
   storage_path: string
   caption: string | null
   created_at: string
+  taken_at: string
+  location_name: string | null
+  location_lat: number | null
+  location_lng: number | null
   uploader: { display_name: string } | null
   activity: { id: string; name: string } | null
   tags: PhotoTag[]
@@ -53,7 +59,8 @@ export function newTagsSince(all: Photo[], userId: string, sinceIso: string): Ph
 }
 
 const SELECT = `
-  id, activity_id, user_id, storage_path, caption, created_at,
+  id, activity_id, user_id, storage_path, caption, created_at, taken_at,
+  location_name, location_lat, location_lng,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
   tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name)),
@@ -74,6 +81,10 @@ interface PhotosState {
   addTag: (photoId: string, userId: string, taggedBy: string) => Promise<{ error: string | null }>
   removeTag: (photoId: string, userId: string) => Promise<{ error: string | null }>
   toggleLike: (photo: Photo, userId: string, isLiked: boolean) => Promise<{ error: string | null }>
+  setPhotoLocation: (
+    photo: Photo,
+    location: { name: string | null; lat: number | null; lng: number | null },
+  ) => Promise<{ error: string | null }>
 }
 
 export const usePhotosStore = create<PhotosState>((set, get) => ({
@@ -128,6 +139,10 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   upload: async (file, userId, activityId) => {
     try {
+      // Must read EXIF from the original file — compression re-encodes the
+      // image through a canvas, which strips all metadata.
+      const [takenAt, location] = await Promise.all([getPhotoTakenAt(file), getPhotoLocation(file)])
+      const locationName = location ? await reverseGeocode(location.lat, location.lng) : null
       const compressed = await compressImage(file)
       const ext = 'jpg'
       const folder = activityId ?? 'album'
@@ -142,6 +157,12 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
         activity_id: activityId,
         user_id: userId,
         storage_path: path,
+        // No EXIF? Fall back to upload time, same as every photo did before
+        // this existed.
+        taken_at: (takenAt ?? new Date()).toISOString(),
+        location_name: locationName,
+        location_lat: location?.lat ?? null,
+        location_lng: location?.lng ?? null,
       })
       if (insertError) return { error: insertError.message }
 
@@ -205,6 +226,24 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
     const { error } = isLiked
       ? await supabase.from('photo_likes').delete().eq('photo_id', photo.id).eq('user_id', userId)
       : await supabase.from('photo_likes').insert({ photo_id: photo.id, user_id: userId })
+    if (error) return { error: error.message }
+
+    if (photo.activity_id) await get().fetchForActivity(photo.activity_id)
+    else await get().fetchAlbum()
+    await get().fetchAll()
+
+    return { error: null }
+  },
+
+  setPhotoLocation: async (photo, location) => {
+    const { error } = await supabase
+      .from('activity_photos')
+      .update({
+        location_name: location.name,
+        location_lat: location.lat,
+        location_lng: location.lng,
+      })
+      .eq('id', photo.id)
     if (error) return { error: error.message }
 
     if (photo.activity_id) await get().fetchForActivity(photo.activity_id)
