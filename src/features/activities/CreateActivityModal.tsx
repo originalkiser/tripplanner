@@ -74,7 +74,12 @@ export function CreateActivityModal({
   const createActivity = useActivitiesStore((s) => s.createActivity)
   const updateActivity = useActivitiesStore((s) => s.updateActivity)
   const inviteParticipants = useActivitiesStore((s) => s.inviteParticipants)
+  const tagParticipants = useActivitiesStore((s) => s.tagParticipants)
   const isEdit = !!activity
+  // A logged visit already happened, so "invite" (a pending ask someone
+  // still has to accept) doesn't fit — people picked here are tagged as
+  // having been there, joined outright with no response needed.
+  const isLogged = logMode || activity?.source === 'logged'
 
   const [members, setMembers] = useState<Member[]>([])
   const [inviteIds, setInviteIds] = useState<Set<string>>(new Set())
@@ -210,7 +215,7 @@ export function CreateActivityModal({
         return
       }
       if (inviteIds.size > 0) {
-        await inviteParticipants(activity.id, [...inviteIds])
+        await (isLogged ? tagParticipants : inviteParticipants)(activity.id, [...inviteIds])
       }
       setSaving(false)
       onClose()
@@ -254,7 +259,7 @@ export function CreateActivityModal({
     }
 
     if (inviteIds.size > 0) {
-      await inviteParticipants(activityId, [...inviteIds])
+      await (isLogged ? tagParticipants : inviteParticipants)(activityId, [...inviteIds])
     }
 
     setSaving(false)
@@ -421,11 +426,13 @@ export function CreateActivityModal({
             </div>
           )}
 
-          {!logMode && inviteCandidates.length > 0 && (
+          {inviteCandidates.length > 0 && (
             <div className="rounded-lg bg-secondary/10 p-3">
-              <p className="text-sm font-medium">Request others to join</p>
+              <p className="text-sm font-medium">{isLogged ? 'Who else was there?' : 'Request others to join'}</p>
               <p className="mt-0.5 text-xs text-text-dim">
-                They'll show up as pending in their notifications until they accept or decline.
+                {isLogged
+                  ? "Tag anyone who visited with you — they'll show up as having joined, no response needed."
+                  : "They'll show up as pending in their notifications until they accept or decline."}
               </p>
               <div className="mt-2 flex flex-col gap-1.5">
                 {inviteCandidates.map((m) => (

@@ -251,6 +251,8 @@ export interface Database {
           address: string | null
           notes: string | null
           link_url: string | null
+          lat: number | null
+          lng: number | null
           updated_by: string | null
           updated_at: string
         }
@@ -260,6 +262,8 @@ export interface Database {
           address?: string | null
           notes?: string | null
           link_url?: string | null
+          lat?: number | null
+          lng?: number | null
           updated_by?: string | null
           updated_at?: string
         }
@@ -409,6 +413,7 @@ export interface Database {
           quantity: number
           status: PackingBringerStatus
           requested_by: string | null
+          packed: boolean
           created_at: string
         }
         Insert: {
@@ -417,6 +422,7 @@ export interface Database {
           quantity?: number
           status?: PackingBringerStatus
           requested_by?: string | null
+          packed?: boolean
           created_at?: string
         }
         Update: Partial<Database['trip']['Tables']['packing_item_bringers']['Insert']>

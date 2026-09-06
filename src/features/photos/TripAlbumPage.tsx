@@ -7,7 +7,7 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl, isVideoPath } from '../../lib/storage'
-import { searchLocations, reverseGeocode, type LocationResult } from '../../lib/geo'
+import { searchLocations, reverseGeocode, milesBetween, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
@@ -32,6 +32,8 @@ function formatTaken(iso: string): string {
 function dayKeyOf(iso: string): string {
   return iso.slice(0, 10)
 }
+
+const HOME_PROXIMITY_MILES = 0.25
 
 function formatDayLabel(dayKey: string): string {
   return new Date(`${dayKey}T12:00:00`).toLocaleDateString(undefined, {
@@ -79,6 +81,16 @@ export function TripAlbumPage() {
   // applies its results if this still matches the token it was issued
   // under, so a slow, superseded search can never clobber what's on screen.
   const locationSearchToken = useRef(0)
+  const [homeLocation, setHomeLocation] = useState<{ lat: number; lng: number } | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+      if (!trip) return
+      const { data: stay } = await supabase.from('stays').select('lat, lng').eq('trip_id', trip.id).maybeSingle()
+      if (stay?.lat != null && stay?.lng != null) setHomeLocation({ lat: stay.lat, lng: stay.lng })
+    })()
+  }, [])
 
   const sortField = sortMode.startsWith('taken') ? 'taken_at' : 'created_at'
   const sortDir = sortMode.endsWith('asc') ? 1 : -1
@@ -242,6 +254,28 @@ export function TripAlbumPage() {
     const q = query.trim().toLowerCase()
     const matches = q ? recentLocations.filter((r) => r.name.toLowerCase().includes(q)) : recentLocations
     return matches.slice(0, 5)
+  }
+
+  // A search result within a quarter mile of where the group is staying is
+  // almost certainly the intended match (e.g. tagging a photo taken at the
+  // house itself) — surface it first as the obvious default instead of
+  // making someone hunt for it among unrelated same-name results elsewhere.
+  function withHomeDefault(results: LocationResult[]): { result: LocationResult; nearHome: boolean }[] {
+    if (!homeLocation) return results.map((result) => ({ result, nearHome: false }))
+    let closest: LocationResult | null = null
+    let closestMiles = Infinity
+    for (const r of results) {
+      const miles = milesBetween(homeLocation, r)
+      if (miles <= HOME_PROXIMITY_MILES && miles < closestMiles) {
+        closest = r
+        closestMiles = miles
+      }
+    }
+    if (!closest) return results.map((result) => ({ result, nearHome: false }))
+    return [
+      { result: closest, nearHome: true },
+      ...results.filter((r) => r.placeId !== closest!.placeId).map((result) => ({ result, nearHome: false })),
+    ]
   }
 
   async function pickRecentLocation(
@@ -595,13 +629,16 @@ export function TripAlbumPage() {
                             </button>
                           </li>
                         ))}
-                        {locationResults.map((r) => (
+                        {withHomeDefault(locationResults).map(({ result: r, nearHome }) => (
                           <li key={r.placeId}>
                             <button
                               type="button"
                               onClick={() => void saveLocation(photo, r)}
-                              className="block w-full px-2 py-1.5 text-left text-xs hover:bg-bg"
+                              className={`flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-xs hover:bg-bg ${
+                                nearHome ? 'bg-accent/10 font-medium' : ''
+                              }`}
                             >
+                              {nearHome && <span title="Near where you're staying">🏠</span>}
                               {r.displayName}
                             </button>
                           </li>
