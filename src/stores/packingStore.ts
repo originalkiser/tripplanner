@@ -7,6 +7,7 @@ export interface PackingBringer {
   quantity: number
   status: PackingBringerStatus
   requested_by: string | null
+  packed: boolean
   profile: { display_name: string; avatar_url: string | null } | null
 }
 
@@ -43,7 +44,7 @@ const ITEM_SELECT = `
   id, packing_list_id, name, quantity_needed, created_by, created_at, deleted_at, deleted_by,
   creator:user_profiles!created_by(display_name),
   bringers:packing_item_bringers(
-    user_id, quantity, status, requested_by,
+    user_id, quantity, status, requested_by, packed,
     profile:user_profiles!user_id(display_name, avatar_url)
   )
 `
@@ -80,6 +81,12 @@ interface PackingState {
   ) => Promise<{ error: string | null }>
   acceptBringRequest: (itemId: string, listId: string, userId: string) => Promise<{ error: string | null }>
   removeBringer: (itemId: string, listId: string, userId: string) => Promise<{ error: string | null }>
+  setPacked: (
+    itemId: string,
+    listId: string,
+    userId: string,
+    packed: boolean,
+  ) => Promise<{ error: string | null }>
   addMembers: (
     listId: string,
     userIds: string[],
@@ -224,6 +231,17 @@ export const usePackingStore = create<PackingState>((set, get) => ({
     const { error } = await supabase
       .from('packing_item_bringers')
       .delete()
+      .eq('packing_item_id', itemId)
+      .eq('user_id', userId)
+    if (error) return { error: error.message }
+    await get().fetchItems(listId)
+    return { error: null }
+  },
+
+  setPacked: async (itemId, listId, userId, packed) => {
+    const { error } = await supabase
+      .from('packing_item_bringers')
+      .update({ packed })
       .eq('packing_item_id', itemId)
       .eq('user_id', userId)
     if (error) return { error: error.message }

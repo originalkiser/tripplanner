@@ -82,6 +82,19 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
   }
 }
 
+const EARTH_RADIUS_MILES = 3958.8
+
+// Great-circle (haversine) distance between two points, in miles.
+export function milesBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * EARTH_RADIUS_MILES * Math.asin(Math.sqrt(h))
+}
+
 export function googleMapsUrl(lat: number, lng: number): string {
   return `https://maps.google.com/?q=${lat},${lng}`
 }

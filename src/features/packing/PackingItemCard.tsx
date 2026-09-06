@@ -23,7 +23,8 @@ export function PackingItemCard({
   // differently (per the toggle at the top of the page).
   accent: 'primary' | 'coral'
 }) {
-  const { addBringer, removeBringer, requestBringer, acceptBringRequest, softDeleteItem } = usePackingStore()
+  const { addBringer, removeBringer, requestBringer, acceptBringRequest, softDeleteItem, setPacked } =
+    usePackingStore()
   const [busy, setBusy] = useState(false)
   const [bringQty, setBringQty] = useState(1)
   const [showAsk, setShowAsk] = useState(false)
@@ -37,6 +38,11 @@ export function PackingItemCard({
   const mine = item.bringers.find((b) => b.user_id === userId)
   const myRequest = mine?.status === 'requested' ? mine : undefined
   const iAmBringing = mine?.status === 'confirmed'
+  // An item can take more than one unit either because it's uncapped or
+  // because its cap is above 1 — either way, whoever's bringing it needs to
+  // be able to say how many, not just that they're bringing "some".
+  const askForQuantity = needed == null || needed > 1
+  const allPacked = confirmed.length > 0 && confirmed.every((b) => b.packed)
 
   const askCandidates = members.filter(
     (m) => !item.bringers.some((b) => b.user_id === m.id && b.status === 'confirmed'),
@@ -85,6 +91,12 @@ export function PackingItemCard({
     setBusy(false)
   }
 
+  async function handleTogglePacked(packed: boolean) {
+    setBusy(true)
+    await setPacked(item.id, listId, userId, packed)
+    setBusy(false)
+  }
+
   return (
     <div className="card-shadow rounded-xl border border-line bg-surface p-3">
       <div className="flex items-start justify-between gap-2">
@@ -97,6 +109,7 @@ export function PackingItemCard({
                 : 'No limit needed'
               : `${covered}/${needed} covered`}
             {isFull && ' ✓'}
+            {allPacked && ' · all packed 📦'}
           </p>
         </div>
         <button
@@ -122,6 +135,19 @@ export function PackingItemCard({
               />
               {b.profile?.display_name}
               {b.quantity > 1 && <span className="text-text-dim">×{b.quantity}</span>}
+              {b.user_id === userId ? (
+                <label className="ml-auto flex items-center gap-1 text-xs text-text-dim">
+                  <input
+                    type="checkbox"
+                    checked={b.packed}
+                    disabled={busy}
+                    onChange={(e) => void handleTogglePacked(e.target.checked)}
+                  />
+                  Packed
+                </label>
+              ) : (
+                b.packed && <span className="ml-auto text-xs text-text-dim">📦 packed</span>
+              )}
             </li>
           ))}
         </ul>
@@ -164,7 +190,7 @@ export function PackingItemCard({
         ) : (
           !myRequest && (
             <div className="flex items-center gap-1.5">
-              {needed == null && (
+              {askForQuantity && (
                 <input
                   type="number"
                   min={1}
@@ -208,7 +234,7 @@ export function PackingItemCard({
                 </option>
               ))}
             </select>
-            {needed == null && (
+            {askForQuantity && (
               <input
                 type="number"
                 min={1}

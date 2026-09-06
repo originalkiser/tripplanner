@@ -41,17 +41,22 @@ export function ActivityListPage() {
     })
   }, [activities, typeFilter])
 
-  // Logged-after-the-fact visits are trip history, not something to plan
-  // around — kept out of the day-by-day/needs-scheduling/unplanned buckets
-  // below and shown in their own "Visited" section instead.
-  const planningActivities = filtered.filter((a) => a.source !== 'logged')
   const loggedEntries = [...filtered.filter((a) => a.source === 'logged')].sort((a, b) =>
     b.created_at.localeCompare(a.created_at),
   )
 
-  const byDay = (date: string) => planningActivities.filter((a) => a.proposed_date === date)
+  // A logged-after-the-fact visit always carries the day it happened on, so
+  // it belongs on that day's list and on the calendar alongside whatever
+  // was planned — it's still shown separately in "Visited" above as the
+  // at-a-glance trip-history log.
+  const byDay = (date: string) => filtered.filter((a) => a.proposed_date === date)
   const plannedCount = TRIP_DAYS.reduce((sum, d) => sum + byDay(d.date).length, 0)
   const today = todayIso()
+
+  // Scheduling/unplanned buckets are for things that still need a
+  // day/time decided — a logged visit already happened, so it never
+  // belongs in either regardless of participants.
+  const planningActivities = filtered.filter((a) => a.source !== 'logged')
 
   const hasEngagement = (a: (typeof planningActivities)[number]) =>
     a.participants.some((p) => p.status === 'joined' || p.status === 'proposed_alt_time')
@@ -142,7 +147,7 @@ export function ActivityListPage() {
         {loading && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
 
         {view === 'calendar' ? (
-          <PlannedCalendarView activities={planningActivities} onSelect={setQuickViewId} />
+          <PlannedCalendarView activities={filtered} onSelect={setQuickViewId} />
         ) : (
           <>
             {TRIP_DAYS.map((day) => {

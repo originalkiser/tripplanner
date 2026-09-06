@@ -16,7 +16,7 @@ import { WifiSection } from './WifiSection'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
-import { googleMapsAddressUrl, appleMapsAddressUrl, isIOS } from '../../lib/geo'
+import { googleMapsAddressUrl, appleMapsAddressUrl, isIOS, searchLocations } from '../../lib/geo'
 
 // An item still "needs" someone: uncapped and nobody's bringing it yet, or
 // capped and still short of the quantity needed.
@@ -58,6 +58,8 @@ interface Stay {
   address: string | null
   notes: string | null
   link_url: string | null
+  lat: number | null
+  lng: number | null
   updated_by: string | null
   updated_at: string
 }
@@ -174,12 +176,28 @@ export function HomePage() {
       return
     }
 
+    const trimmedAddress = address.trim() || null
+    // Only re-geocode when the address text actually changed — saving just a
+    // notes/link edit shouldn't cost a Nominatim round trip or risk losing
+    // a good match to a slightly different top result for the same address.
+    let lat = stay?.address === trimmedAddress ? (stay?.lat ?? null) : null
+    let lng = stay?.address === trimmedAddress ? (stay?.lng ?? null) : null
+    if (trimmedAddress && lat == null) {
+      const [match] = await searchLocations(trimmedAddress)
+      if (match) {
+        lat = match.lat
+        lng = match.lng
+      }
+    }
+
     const { error } = await supabase.from('stays').upsert({
       trip_id: trip.id,
       name: name.trim() || null,
-      address: address.trim() || null,
+      address: trimmedAddress,
       notes: notes.trim() || null,
       link_url: linkUrl.trim() || null,
+      lat,
+      lng,
       updated_by: profile.id,
       updated_at: new Date().toISOString(),
     })
