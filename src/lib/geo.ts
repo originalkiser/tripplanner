@@ -20,13 +20,34 @@ export interface LocationResult {
   placeId: string
 }
 
+// Covers both Savannah and Tybee, used to bias (not restrict) search results
+// toward the local area — see searchLocations for why this replaced
+// appending ", Savannah, GA" to the query text.
+const LOCAL_BOUNDS = {
+  minLat: Math.min(CATEGORY_BOUNDS.savannah.minLat, CATEGORY_BOUNDS.tybee.minLat),
+  maxLat: Math.max(CATEGORY_BOUNDS.savannah.maxLat, CATEGORY_BOUNDS.tybee.maxLat),
+  minLng: Math.min(CATEGORY_BOUNDS.savannah.minLng, CATEGORY_BOUNDS.tybee.minLng),
+  maxLng: Math.max(CATEGORY_BOUNDS.savannah.maxLng, CATEGORY_BOUNDS.tybee.maxLng),
+}
+
 export async function searchLocations(query: string): Promise<LocationResult[]> {
   if (query.trim().length < 3) return []
 
   const url = new URL('https://nominatim.openstreetmap.org/search')
   url.searchParams.set('format', 'json')
-  url.searchParams.set('q', `${query}, Savannah, GA`)
-  url.searchParams.set('limit', '5')
+  url.searchParams.set('q', query)
+  url.searchParams.set('limit', '8')
+  // Appending a fixed ", Savannah, GA" to every query broke named-place
+  // search: typing something already containing an area name (e.g.
+  // "Stingray's Seafood, Tybee") produced a self-contradicting address
+  // ("...Tybee, Savannah, GA") that Nominatim's address parser couldn't
+  // resolve, so business/POI names came back sparse or empty. A viewbox
+  // bias (not a hard filter — bounded=0 is the default) nudges ranking
+  // toward the local area without touching what the person actually typed.
+  url.searchParams.set(
+    'viewbox',
+    `${LOCAL_BOUNDS.minLng},${LOCAL_BOUNDS.maxLat},${LOCAL_BOUNDS.maxLng},${LOCAL_BOUNDS.minLat}`,
+  )
 
   const res = await fetch(url)
   if (!res.ok) return []
