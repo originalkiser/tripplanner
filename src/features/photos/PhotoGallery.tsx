@@ -7,7 +7,7 @@ import { downloadPhoto } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 
 const SWIPE_THRESHOLD_PX = 50
-const HEART_BURST_MS = 700
+const HEART_BURST_MS = 1400
 
 export function PhotoGallery({ activityId, photos }: { activityId: string | null; photos: Photo[] }) {
   const profile = useAuthStore((s) => s.profile)

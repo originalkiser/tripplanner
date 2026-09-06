@@ -403,17 +403,25 @@ h4 {
   animation: photo-slide-in-left 220ms ease-out;
 }
 
-/* Double-tap-to-like heart burst — pops in, holds briefly, fades out. */
+/* Double-tap-to-like heart burst — pops in, holds, then fades out. Most of
+   the timeline (25%-70%) is a deliberate hold at full size/opacity so the
+   heart actually registers before it fades, instead of the fade starting
+   almost immediately after the pop-in. */
 @keyframes heart-burst {
   0% {
     opacity: 0;
     transform: scale(0.3);
   }
-  15% {
+  12% {
     opacity: 1;
     transform: scale(1.15);
   }
-  30% {
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
     transform: scale(1);
   }
   100% {
@@ -422,7 +430,7 @@ h4 {
   }
 }
 .heart-burst {
-  animation: heart-burst 700ms ease-out forwards;
+  animation: heart-burst 1400ms ease-out forwards;
 }
 
 /* Leaflet dark mode — there's still only the one free OSM raster tile
