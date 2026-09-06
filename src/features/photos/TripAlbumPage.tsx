@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { usePhotosStore, type Photo } from '../../stores/photosStore'
+import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { usePhotoSeenStore } from '../../stores/photoSeenStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl } from '../../lib/storage'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
+import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
 
 const SWIPE_THRESHOLD_PX = 50
+const DOUBLE_TAP_MS = 300
+const SINGLE_TAP_DELAY_MS = 250
+const HEART_BURST_MS = 700
 
 function formatTaken(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -24,7 +28,7 @@ function formatTaken(iso: string): string {
 
 export function TripAlbumPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag } = usePhotosStore()
+  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike } = usePhotosStore()
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
@@ -41,6 +45,9 @@ export function TripAlbumPage() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
+  const [burstId, setBurstId] = useState<string | null>(null)
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastTap = useRef<{ photoId: string; time: number } | null>(null)
 
   const lightbox = lightboxIndex != null ? all[lightboxIndex] : null
 
@@ -163,6 +170,45 @@ export function TripAlbumPage() {
     setLightboxIndex(i)
   }
 
+  function handleLikeToggle(photo: Photo) {
+    if (!profile) return
+    void toggleLike(photo, profile.id, hasLiked(photo, profile.id))
+  }
+
+  // Double-tap always likes (never unlikes) and always plays the heart
+  // burst, even if already liked — matches the familiar Instagram gesture.
+  function triggerLikeBurst(photo: Photo) {
+    setBurstId(photo.id)
+    setTimeout(() => setBurstId((id) => (id === photo.id ? null : id)), HEART_BURST_MS)
+    if (profile && !hasLiked(photo, profile.id)) {
+      void toggleLike(photo, profile.id, false)
+    }
+  }
+
+  // A single tap opens the photo (or toggles selection); a second tap on
+  // the same photo within DOUBLE_TAP_MS likes it instead. The single-tap
+  // action is delayed just long enough to cancel it if a second tap lands.
+  function handlePhotoTap(i: number) {
+    const photo = all[i]
+    const now = Date.now()
+    const isDoubleTap = lastTap.current?.photoId === photo.id && now - lastTap.current.time < DOUBLE_TAP_MS
+    lastTap.current = { photoId: photo.id, time: now }
+
+    if (isDoubleTap) {
+      if (tapTimer.current) {
+        clearTimeout(tapTimer.current)
+        tapTimer.current = null
+      }
+      triggerLikeBurst(photo)
+      return
+    }
+
+    tapTimer.current = setTimeout(() => {
+      tapTimer.current = null
+      openPhoto(i)
+    }, SINGLE_TAP_DELAY_MS)
+  }
+
   async function handleDownloadSelected() {
     const selected = all.filter((p) => selectedIds.has(p.id))
     if (selected.length === 0) return
@@ -228,7 +274,11 @@ export function TripAlbumPage() {
           const canManage = profile && (profile.id === photo.user_id || profile.is_admin)
           return (
             <div key={photo.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-              <button type="button" onClick={() => openPhoto(i)} className="relative block w-full">
+              <button
+                type="button"
+                onClick={() => (selectMode ? toggleSelected(photo.id) : handlePhotoTap(i))}
+                className="relative block w-full touch-manipulation"
+              >
                 <img src={tripPhotoUrl(photo.storage_path)} alt="" className="max-h-96 w-full object-cover" />
                 {selectMode && (
                   <span
@@ -239,12 +289,26 @@ export function TripAlbumPage() {
                     {selectedIds.has(photo.id) ? '✓' : ''}
                   </span>
                 )}
+                {burstId === photo.id && (
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <HeartIcon filled className="heart-burst h-20 w-20 drop-shadow-lg" />
+                  </span>
+                )}
               </button>
               <div className="flex flex-col gap-2 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{photo.uploader?.display_name ?? 'Someone'}</span>
                   <span className="font-data text-xs text-text-dim">{formatTaken(photo.created_at)}</span>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleLikeToggle(photo)}
+                  className="flex items-center gap-1.5 self-start text-text-dim"
+                >
+                  <HeartIcon filled={!!profile && hasLiked(photo, profile.id)} className="h-5 w-5" />
+                  {photo.likes.length > 0 && <span className="font-data text-xs">{photo.likes.length}</span>}
+                </button>
 
                 <select
                   value={photo.activity_id ?? ''}
@@ -404,16 +468,33 @@ export function TripAlbumPage() {
               key={lightbox.id}
               src={tripPhotoUrl(lightbox.storage_path)}
               alt=""
-              className={`max-h-[96dvh] max-w-full object-contain ${
+              className={`max-h-[96dvh] max-w-full touch-manipulation object-contain ${
                 slideDir === 'right' ? 'photo-slide-in-right' : slideDir === 'left' ? 'photo-slide-in-left' : ''
               }`}
               onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                triggerLikeBurst(lightbox)
+              }}
             />
+            {burstId === lightbox.id && (
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <HeartIcon filled className="heart-burst h-28 w-28 drop-shadow-lg" />
+              </span>
+            )}
             <div
               className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/50 px-4 py-2 text-sm text-white"
               onClick={(e) => e.stopPropagation()}
             >
               <span>{lightbox.uploader?.display_name}</span>
+              <button
+                type="button"
+                onClick={() => handleLikeToggle(lightbox)}
+                className="flex items-center gap-1"
+              >
+                <HeartIcon filled={!!profile && hasLiked(lightbox, profile.id)} className="h-5 w-5" />
+                {lightbox.likes.length > 0 && <span className="font-data text-xs">{lightbox.likes.length}</span>}
+              </button>
               <button
                 type="button"
                 disabled={downloadingId === lightbox.id}

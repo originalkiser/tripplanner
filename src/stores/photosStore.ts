@@ -9,6 +9,10 @@ export interface PhotoTag {
   profile: { display_name: string } | null
 }
 
+export interface PhotoLike {
+  user_id: string
+}
+
 export interface Photo {
   id: string
   activity_id: string | null
@@ -19,6 +23,11 @@ export interface Photo {
   uploader: { display_name: string } | null
   activity: { id: string; name: string } | null
   tags: PhotoTag[]
+  likes: PhotoLike[]
+}
+
+export function hasLiked(photo: Photo, userId: string): boolean {
+  return photo.likes.some((l) => l.user_id === userId)
 }
 
 // Photos uploaded by someone other than the given user since the given
@@ -47,7 +56,8 @@ const SELECT = `
   id, activity_id, user_id, storage_path, caption, created_at,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
-  tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name))
+  tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name)),
+  likes:photo_likes(user_id)
 `
 
 interface PhotosState {
@@ -63,6 +73,7 @@ interface PhotosState {
   linkToActivity: (photoId: string, activityId: string | null) => Promise<{ error: string | null }>
   addTag: (photoId: string, userId: string, taggedBy: string) => Promise<{ error: string | null }>
   removeTag: (photoId: string, userId: string) => Promise<{ error: string | null }>
+  toggleLike: (photo: Photo, userId: string, isLiked: boolean) => Promise<{ error: string | null }>
 }
 
 export const usePhotosStore = create<PhotosState>((set, get) => ({
@@ -187,6 +198,19 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
       .eq('user_id', userId)
     if (error) return { error: error.message }
     await get().fetchAll()
+    return { error: null }
+  },
+
+  toggleLike: async (photo, userId, isLiked) => {
+    const { error } = isLiked
+      ? await supabase.from('photo_likes').delete().eq('photo_id', photo.id).eq('user_id', userId)
+      : await supabase.from('photo_likes').insert({ photo_id: photo.id, user_id: userId })
+    if (error) return { error: error.message }
+
+    if (photo.activity_id) await get().fetchForActivity(photo.activity_id)
+    else await get().fetchAlbum()
+    await get().fetchAll()
+
     return { error: null }
   },
 }))
