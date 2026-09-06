@@ -6,7 +6,7 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { tripPhotoUrl } from '../../lib/storage'
-import { searchLocations, type LocationResult } from '../../lib/geo'
+import { searchLocations, reverseGeocode, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
 import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
@@ -68,6 +68,8 @@ export function TripAlbumPage() {
   const [locationQuery, setLocationQuery] = useState('')
   const [locationResults, setLocationResults] = useState<LocationResult[]>([])
   const [savingLocation, setSavingLocation] = useState(false)
+  const [locatingSelf, setLocatingSelf] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
   const locationSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const sortField = sortMode.startsWith('taken') ? 'taken_at' : 'created_at'
@@ -206,6 +208,7 @@ export function TripAlbumPage() {
     setEditingLocationId(photo.id)
     setLocationQuery(photo.location_name ?? '')
     setLocationResults([])
+    setLocationError(null)
   }
 
   function onLocationInput(value: string) {
@@ -228,6 +231,28 @@ export function TripAlbumPage() {
     setSavingLocation(false)
     setEditingLocationId(null)
     setLocationResults([])
+  }
+
+  function locateMyPosition(photo: Photo) {
+    if (!navigator.geolocation) {
+      setLocationError("This browser can't share your location.")
+      return
+    }
+    setLocationError(null)
+    setLocatingSelf(true)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords
+        const name = (await reverseGeocode(lat, lng)) ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+        setLocatingSelf(false)
+        await saveLocation(photo, { displayName: name, lat, lng, placeId: 'my-location' })
+      },
+      () => {
+        setLocatingSelf(false)
+        setLocationError("Couldn't get your location — check location permissions.")
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
   }
 
   // Double-tap always likes (never unlikes) and always plays the heart
@@ -489,6 +514,15 @@ export function TripAlbumPage() {
                         Cancel
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      disabled={locatingSelf || savingLocation}
+                      onClick={() => locateMyPosition(photo)}
+                      className="mt-1 text-xs font-medium text-primary underline disabled:opacity-50"
+                    >
+                      {locatingSelf ? 'Finding you…' : '📍 Use my location'}
+                    </button>
+                    {locationError && <p className="mt-1 text-xs text-red-600">{locationError}</p>}
                     {locationResults.length > 0 && (
                       <ul className="absolute z-10 mt-1 w-full rounded-lg border border-line bg-surface shadow-lg">
                         {locationResults.map((r) => (
