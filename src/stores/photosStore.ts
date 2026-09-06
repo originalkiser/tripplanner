@@ -36,6 +36,11 @@ export function hasLiked(photo: Photo, userId: string): boolean {
   return photo.likes.some((l) => l.user_id === userId)
 }
 
+function extensionOf(filename: string, fallback: string): string {
+  const match = /\.([a-zA-Z0-9]+)$/.exec(filename)
+  return match ? match[1].toLowerCase() : fallback
+}
+
 // Photos uploaded by someone other than the given user since the given
 // timestamp — powers the Home "new photos" notification.
 export function newPhotosSince(all: Photo[], userId: string, sinceIso: string): Photo[] {
@@ -139,18 +144,27 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   upload: async (file, userId, activityId) => {
     try {
-      // Must read EXIF from the original file — compression re-encodes the
-      // image through a canvas, which strips all metadata.
-      const [takenAt, location] = await Promise.all([getPhotoTakenAt(file), getPhotoLocation(file)])
+      const isVideo = file.type.startsWith('video/')
+
+      // EXIF (capture time, GPS) only exists on the original image file —
+      // compression re-encodes it through a canvas, which strips all
+      // metadata — and doesn't apply to video at all.
+      const [takenAt, location] = isVideo
+        ? [null, null]
+        : await Promise.all([getPhotoTakenAt(file), getPhotoLocation(file)])
       const locationName = location ? await reverseGeocode(location.lat, location.lng) : null
-      const compressed = await compressImage(file)
-      const ext = 'jpg'
+
+      // Video is uploaded as-is (no client-side transcoding); only images go
+      // through the compress-to-JPEG pipeline.
+      const toUpload = isVideo ? file : await compressImage(file)
+      const ext = isVideo ? extensionOf(file.name, 'mp4') : 'jpg'
+      const contentType = isVideo ? file.type || 'video/mp4' : 'image/jpeg'
       const folder = activityId ?? 'album'
       const path = `${folder}/${crypto.randomUUID()}.${ext}`
 
       const { error: uploadError } = await supabase.storage
         .from('trip-photos')
-        .upload(path, compressed, { contentType: 'image/jpeg' })
+        .upload(path, toUpload, { contentType })
       if (uploadError) return { error: uploadError.message }
 
       const { error: insertError } = await supabase.from('activity_photos').insert({
