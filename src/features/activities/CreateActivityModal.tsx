@@ -268,8 +268,19 @@ export function CreateActivityModal({
 
   return (
     <div className="fixed inset-0 z-50 flex h-[100dvh] flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
-      <div className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-surface">
-        <div className="flex items-center justify-between border-b border-line p-4">
+      {/* The card itself — not the form — is the scrolling region, with the
+          header and save button sticky within it. A fixed-height mobile
+          viewport (h-[100dvh] above) can still end up wrong once the
+          on-screen keyboard opens, since keyboards shrink the *visual*
+          viewport without most browsers shrinking dvh/fixed-position layout
+          to match — that previously left the save button stranded behind
+          the keyboard with the scrollable form unable to reach it. Making
+          the whole card a real overflow-y-auto region means touch-scroll
+          can always reach the bottom regardless of that mismatch, and the
+          sticky button lands there without needing an exact scroll
+          position. */}
+      <div className="flex max-h-full w-full max-w-md flex-col overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-surface">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface p-4">
           <h2 className="text-xl font-semibold text-primary">
             {isEdit ? 'Edit Activity' : logMode ? 'Log a Visit' : 'New Activity'}
           </h2>
@@ -278,11 +289,7 @@ export function CreateActivityModal({
           </button>
         </div>
 
-        <form
-          id="activity-form"
-          onSubmit={submit}
-          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4"
-        >
+        <form id="activity-form" onSubmit={submit} className="flex flex-col gap-4 p-4">
           <div className="flex gap-2">
             {TYPE_OPTIONS.map((opt) => (
               <button
@@ -511,10 +518,11 @@ export function CreateActivityModal({
 
         </form>
 
-        {/* Outside the scrollable form (referenced via form="activity-form")
-            so the primary action is always reachable without depending on
-            touch-scroll working perfectly on every device. */}
-        <div className="shrink-0 border-t border-line p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        {/* Outside the <form> (referenced via form="activity-form") but
+            still inside the scrolling card, and sticky to its bottom —
+            visible without scrolling when everything fits, and reachable by
+            scrolling the card when it doesn't. */}
+        <div className="sticky bottom-0 border-t border-line bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
           {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
           <button
             type="submit"

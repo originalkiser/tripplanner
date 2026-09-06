@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget=resizes-content: on browsers that honor it, the
+         layout viewport (and dvh/vh units, and `position: fixed` sizing)
+         shrinks when the on-screen keyboard opens, instead of only the
+         visual viewport — without it, fixed full-screen overlays keep
+         sizing themselves as if the keyboard weren't there, and their
+         lower portion ends up hidden behind it. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <title>Trip Planner</title>
   </head>
   <body>
