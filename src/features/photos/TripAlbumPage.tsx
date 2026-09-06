@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { usePhotoSeenStore } from '../../stores/photoSeenStore'
+import { useRecentLocationsStore } from '../../stores/recentLocationsStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
@@ -47,6 +48,8 @@ export function TripAlbumPage() {
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
+  const recentLocations = useRecentLocationsStore((s) => s.recent)
+  const recordRecentLocation = useRecentLocationsStore((s) => s.record)
 
   const [members, setMembers] = useState<Member[]>([])
   const [uploading, setUploading] = useState(false)
@@ -71,6 +74,11 @@ export function TripAlbumPage() {
   const [locatingSelf, setLocatingSelf] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
   const locationSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Bumped on every action that should invalidate any in-flight search (new
+  // input, opening/closing/switching the editor) — an async search only
+  // applies its results if this still matches the token it was issued
+  // under, so a slow, superseded search can never clobber what's on screen.
+  const locationSearchToken = useRef(0)
 
   const sortField = sortMode.startsWith('taken') ? 'taken_at' : 'created_at'
   const sortDir = sortMode.endsWith('asc') ? 1 : -1
@@ -204,7 +212,16 @@ export function TripAlbumPage() {
     void toggleLike(photo, profile.id, hasLiked(photo, profile.id))
   }
 
+  function closeLocationEditor() {
+    if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current)
+    locationSearchToken.current += 1
+    setEditingLocationId(null)
+    setLocationResults([])
+  }
+
   function startEditingLocation(photo: Photo) {
+    if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current)
+    locationSearchToken.current += 1
     setEditingLocationId(photo.id)
     setLocationQuery(photo.location_name ?? '')
     setLocationResults([])
@@ -214,30 +231,12 @@ export function TripAlbumPage() {
   function onLocationInput(value: string) {
     setLocationQuery(value)
     if (locationSearchTimer.current) clearTimeout(locationSearchTimer.current)
+    const token = ++locationSearchToken.current
     locationSearchTimer.current = setTimeout(async () => {
-      setLocationResults(await searchLocations(value))
+      const results = await searchLocations(value)
+      if (locationSearchToken.current === token) setLocationResults(results)
     }, 400)
   }
-
-  // One entry per distinct name already used on some photo, newest first —
-  // lets tagging a run of photos from the same spot skip typing/searching
-  // after the first one.
-  const recentLocations = (() => {
-    const byName = new Map<string, { name: string; lat: number | null; lng: number | null; lastUsed: string }>()
-    for (const p of all) {
-      if (!p.location_name) continue
-      const existing = byName.get(p.location_name)
-      if (!existing || p.taken_at > existing.lastUsed) {
-        byName.set(p.location_name, {
-          name: p.location_name,
-          lat: p.location_lat,
-          lng: p.location_lng,
-          lastUsed: p.taken_at,
-        })
-      }
-    }
-    return [...byName.values()].sort((a, b) => b.lastUsed.localeCompare(a.lastUsed))
-  })()
 
   function matchingRecentLocations(query: string) {
     const q = query.trim().toLowerCase()
@@ -251,9 +250,9 @@ export function TripAlbumPage() {
   ) {
     setSavingLocation(true)
     await setPhotoLocation(photo, { name: recent.name, lat: recent.lat, lng: recent.lng })
+    recordRecentLocation(recent)
     setSavingLocation(false)
-    setEditingLocationId(null)
-    setLocationResults([])
+    closeLocationEditor()
   }
 
   // Picking a suggestion sets real coordinates; just typing a name and
@@ -265,9 +264,9 @@ export function TripAlbumPage() {
     const lat = picked?.lat ?? (name ? photo.location_lat : null)
     const lng = picked?.lng ?? (name ? photo.location_lng : null)
     await setPhotoLocation(photo, { name, lat, lng })
+    if (name) recordRecentLocation({ name, lat, lng })
     setSavingLocation(false)
-    setEditingLocationId(null)
-    setLocationResults([])
+    closeLocationEditor()
   }
 
   function locateMyPosition(photo: Photo) {
@@ -568,7 +567,7 @@ export function TripAlbumPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditingLocationId(null)}
+                        onClick={closeLocationEditor}
                         className="shrink-0 rounded-lg bg-bg px-2 py-1 text-xs"
                       >
                         Cancel
