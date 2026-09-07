@@ -18,6 +18,23 @@ const SELECT = `
   user:user_profiles(display_name)
 `
 
+// Forces an inner join on activities so the trip_id filter below actually
+// restricts the top-level rows (a plain embedded/left-joined relation
+// wouldn't).
+const SELECT_WITH_TRIP = `
+  id, change_type, summary_text, created_at, user_id,
+  activity:activities!inner(id, name, proposed_date, trip_id),
+  user:user_profiles(display_name)
+`
+
+let cachedTripId: string | null = null
+async function getActiveTripId(): Promise<string | null> {
+  if (cachedTripId) return cachedTripId
+  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+  cachedTripId = data?.id ?? null
+  return cachedTripId
+}
+
 interface DigestState {
   sinceLastVisit: ChangeEntry[]
   loadingSinceLastVisit: boolean
@@ -42,9 +59,11 @@ export const useDigestStore = create<DigestState>((set) => ({
       return
     }
     set({ loadingSinceLastVisit: true })
+    const tripId = await getActiveTripId()
     const { data, error } = await supabase
       .from('activity_changes')
-      .select(SELECT)
+      .select(SELECT_WITH_TRIP)
+      .eq('activity.trip_id', tripId ?? '')
       .gt('created_at', sinceIso)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -59,11 +78,13 @@ export const useDigestStore = create<DigestState>((set) => ({
 
   fetchDay: async (date) => {
     set({ loadingDay: true })
+    const tripId = await getActiveTripId()
     const start = `${date}T00:00:00.000Z`
     const end = `${date}T23:59:59.999Z`
     const { data, error } = await supabase
       .from('activity_changes')
-      .select(SELECT)
+      .select(SELECT_WITH_TRIP)
+      .eq('activity.trip_id', tripId ?? '')
       .gte('created_at', start)
       .lte('created_at', end)
       .order('created_at', { ascending: false })

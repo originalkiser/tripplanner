@@ -18,6 +18,7 @@ export interface PhotoLike {
 
 export interface Photo {
   id: string
+  trip_id: string
   activity_id: string | null
   user_id: string
   storage_path: string
@@ -36,6 +37,14 @@ export interface Photo {
 
 export function hasLiked(photo: Photo, userId: string): boolean {
   return photo.likes.some((l) => l.user_id === userId)
+}
+
+let cachedTripId: string | null = null
+async function getActiveTripId(): Promise<string | null> {
+  if (cachedTripId) return cachedTripId
+  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+  cachedTripId = data?.id ?? null
+  return cachedTripId
 }
 
 function extensionOf(filename: string, fallback: string): string {
@@ -72,7 +81,7 @@ export function newTagsSince(
 }
 
 const SELECT = `
-  id, activity_id, user_id, storage_path, caption, created_at, taken_at,
+  id, trip_id, activity_id, user_id, storage_path, caption, created_at, taken_at,
   location_name, location_lat, location_lng, archived_at,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
@@ -133,9 +142,11 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   fetchAlbum: async () => {
     set({ loading: true })
+    const tripId = await getActiveTripId()
     const { data, error } = await supabase
       .from('activity_photos')
       .select(SELECT)
+      .eq('trip_id', tripId ?? '')
       .is('activity_id', null)
       .order('created_at', { ascending: false })
     if (error) {
@@ -148,9 +159,11 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   fetchAll: async () => {
     set({ loading: true })
+    const tripId = await getActiveTripId()
     const { data, error } = await supabase
       .from('activity_photos')
       .select(SELECT)
+      .eq('trip_id', tripId ?? '')
       .order('created_at', { ascending: true })
     if (error) {
       console.error(error)
@@ -162,6 +175,9 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   upload: async (file, userId, activityId) => {
     try {
+      const tripId = await getActiveTripId()
+      if (!tripId) return { error: 'No active trip found.' }
+
       const isVideo = file.type.startsWith('video/')
 
       // EXIF (capture time, GPS) only exists on the original image file —
@@ -186,6 +202,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
       if (uploadError) return { error: uploadError.message }
 
       const { error: insertError } = await supabase.from('activity_photos').insert({
+        trip_id: tripId,
         activity_id: activityId,
         user_id: userId,
         storage_path: path,

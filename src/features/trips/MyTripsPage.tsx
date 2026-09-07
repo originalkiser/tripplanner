@@ -17,8 +17,9 @@ function formatDateRange(start: string, end: string): string {
 
 export function MyTripsPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { myTrips, members, fetchMyTrips, fetchMembers, setMemberRole, updateMyDetails, addMembers } =
+  const { myTrips, members, fetchMyTrips, fetchMembers, setMemberRole, updateMyDetails, addMembers, activateTrip } =
     useTripsStore()
+  const [activatingId, setActivatingId] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [knownUsers, setKnownUsers] = useState<Member[]>([])
@@ -96,6 +97,7 @@ export function MyTripsPage() {
             {expandedId === trip.id && profile && (
               <TripManagePanel
                 tripId={trip.id}
+                isActive={trip.is_active}
                 isAdmin={trip.myRole === 'admin'}
                 members={members[trip.id] ?? []}
                 knownUsers={knownUsers}
@@ -103,6 +105,20 @@ export function MyTripsPage() {
                 onSetRole={setMemberRole}
                 onUpdateMyDetails={updateMyDetails}
                 onAddMembers={addMembers}
+                activating={activatingId === trip.id}
+                onActivate={async () => {
+                  if (
+                    !confirm(
+                      `Make "${trip.name}" the active trip? Everyone will see its Plans, Packing List, Album, etc. instead of the current trip's.`,
+                    )
+                  ) {
+                    return
+                  }
+                  setActivatingId(trip.id)
+                  await activateTrip(trip.id)
+                  setActivatingId(null)
+                  if (profile) void fetchMyTrips(profile.id)
+                }}
               />
             )}
           </li>
@@ -124,6 +140,7 @@ export function MyTripsPage() {
 
 function TripManagePanel({
   tripId,
+  isActive,
   isAdmin,
   members,
   knownUsers,
@@ -131,8 +148,11 @@ function TripManagePanel({
   onSetRole,
   onUpdateMyDetails,
   onAddMembers,
+  activating,
+  onActivate,
 }: {
   tripId: string
+  isActive: boolean
   isAdmin: boolean
   members: ReturnType<typeof useTripsStore.getState>['members'][string]
   knownUsers: Member[]
@@ -140,6 +160,8 @@ function TripManagePanel({
   onSetRole: (tripId: string, userId: string, role: 'admin' | 'member') => Promise<{ error: string | null }>
   onUpdateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
   onAddMembers: (tripId: string, userIds: string[]) => Promise<{ error: string | null }>
+  activating: boolean
+  onActivate: () => void
 }) {
   const mine = members.find((m) => m.user_id === myUserId)
   const [arrivalDate, setArrivalDate] = useState('')
@@ -195,6 +217,17 @@ function TripManagePanel({
 
   return (
     <div className="border-t border-line p-3">
+      {isAdmin && !isActive && (
+        <button
+          type="button"
+          disabled={activating}
+          onClick={onActivate}
+          className="mb-3 w-full rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+        >
+          {activating ? 'Activating…' : 'Make this the active trip'}
+        </button>
+      )}
+
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-dim">Roster</p>
       <ul className="flex flex-col gap-2">
         {members.map((m) => (

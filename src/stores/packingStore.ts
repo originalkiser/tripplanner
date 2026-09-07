@@ -109,10 +109,14 @@ export const usePackingStore = create<PackingState>((set, get) => ({
   fetchLists: async () => {
     set({ loading: true })
     // RLS already scopes this to the shared trip list plus whichever
-    // private lists this user belongs to.
+    // private lists this user belongs to, but not to a specific trip — the
+    // active-trip filter below is what keeps a second trip's packing lists
+    // from being mixed in here.
+    const tripId = await getActiveTripId()
     const { data, error } = await supabase
       .from('packing_lists')
       .select('id, trip_id, kind, name, created_by, created_at')
+      .eq('trip_id', tripId ?? '')
       .order('created_at', { ascending: true })
 
     if (error) {
