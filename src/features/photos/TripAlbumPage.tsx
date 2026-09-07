@@ -81,6 +81,10 @@ export function TripAlbumPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [filterKind, setFilterKind] = useState<'liked' | 'tagged' | 'event' | 'day' | null>(null)
+  const [filterUserIds, setFilterUserIds] = useState<Set<string>>(new Set())
+  const [filterEventIds, setFilterEventIds] = useState<Set<string>>(new Set())
+  const [filterDayKeys, setFilterDayKeys] = useState<Set<string>>(new Set())
   const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
   const [editingArchiveLink, setEditingArchiveLink] = useState(false)
   const [archiveLinkInput, setArchiveLinkInput] = useState('')
@@ -251,6 +255,10 @@ export function TripAlbumPage() {
   function exitSelectMode() {
     setSelectMode(false)
     setSelectedIds(new Set())
+    setFilterKind(null)
+    setFilterUserIds(new Set())
+    setFilterEventIds(new Set())
+    setFilterDayKeys(new Set())
   }
 
   function openPhoto(i: number) {
@@ -464,27 +472,54 @@ export function TripAlbumPage() {
     setSelectedIds(new Set(all.filter(predicate).map((p) => p.id)))
   }
 
-  function selectLiked() {
-    if (!profile) return
-    selectFiltered((p) => hasLiked(p, profile.id))
-  }
-
-  function selectTagged() {
-    if (!profile) return
-    selectFiltered((p) => p.tags.some((t) => t.user_id === profile.id))
-  }
-
-  function selectByActivity(activityId: string) {
-    if (!activityId) return
-    selectFiltered((p) => p.activity_id === activityId)
-  }
-
-  function selectByDay(dayKey: string) {
-    if (!dayKey) return
-    selectFiltered((p) => dayKeyOf(p.created_at) === dayKey)
-  }
-
   const uniqueDays = Array.from(new Set(all.map((p) => dayKeyOf(p.created_at)))).sort()
+
+  // "Liked" applies straight away (nothing to narrow further); the other
+  // three switch on a secondary multi-select instead of picking a single
+  // value, so a filter can span several tagged people/events/days at once.
+  function pickFilterKind(kind: typeof filterKind) {
+    const next = filterKind === kind ? null : kind
+    setFilterKind(next)
+    setFilterUserIds(new Set())
+    setFilterEventIds(new Set())
+    setFilterDayKeys(new Set())
+    if (next === 'liked' && profile) selectFiltered((p) => hasLiked(p, profile.id))
+    else if (next === null) exitSelectMode()
+    else {
+      setSelectMode(true)
+      setSelectedIds(new Set())
+    }
+  }
+
+  function toggleFilterUser(userId: string) {
+    setFilterUserIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      selectFiltered((p) => p.tags.some((t) => next.has(t.user_id)))
+      return next
+    })
+  }
+
+  function toggleFilterEvent(activityId: string) {
+    setFilterEventIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(activityId)) next.delete(activityId)
+      else next.add(activityId)
+      selectFiltered((p) => p.activity_id != null && next.has(p.activity_id))
+      return next
+    })
+  }
+
+  function toggleFilterDay(dayKey: string) {
+    setFilterDayKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(dayKey)) next.delete(dayKey)
+      else next.add(dayKey)
+      selectFiltered((p) => next.has(dayKeyOf(p.created_at)))
+      return next
+    })
+  }
 
   return (
     <div className="mx-auto max-w-md p-4 pb-32">
@@ -521,53 +556,114 @@ export function TripAlbumPage() {
       )}
 
       {all.length > 0 && (
-        <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1">
-          <span className="shrink-0 text-xs font-medium text-text-dim">Quick export:</span>
-          <button
-            type="button"
-            onClick={selectLiked}
-            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
-          >
-            ❤ Liked
-          </button>
-          <button
-            type="button"
-            onClick={selectTagged}
-            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
-          >
-            🏷 Tagged
-          </button>
-          {activities.length > 0 && (
-            <select
-              value=""
-              onChange={(e) => selectByActivity(e.target.value)}
-              className="shrink-0 rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+        <div className="mt-3 flex flex-col gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            <span className="shrink-0 text-xs font-medium text-text-dim">Quick export:</span>
+            <button
+              type="button"
+              onClick={() => pickFilterKind('liked')}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                filterKind === 'liked' ? 'bg-primary text-white' : 'bg-bg text-text-dim'
+              }`}
             >
-              <option value="" disabled>
-                By event…
-              </option>
-              {activities.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
+              ❤ Liked
+            </button>
+            <button
+              type="button"
+              onClick={() => pickFilterKind('tagged')}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                filterKind === 'tagged' ? 'bg-primary text-white' : 'bg-bg text-text-dim'
+              }`}
+            >
+              🏷 Tagged
+            </button>
+            {activities.length > 0 && (
+              <button
+                type="button"
+                onClick={() => pickFilterKind('event')}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                  filterKind === 'event' ? 'bg-primary text-white' : 'bg-bg text-text-dim'
+                }`}
+              >
+                📍 By event
+              </button>
+            )}
+            {uniqueDays.length > 1 && (
+              <button
+                type="button"
+                onClick={() => pickFilterKind('day')}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${
+                  filterKind === 'day' ? 'bg-primary text-white' : 'bg-bg text-text-dim'
+                }`}
+              >
+                📅 By day
+              </button>
+            )}
+          </div>
+
+          {/* Secondary multi-select, specific to whichever filter kind is
+              picked above — "Liked" has nothing to narrow further and
+              applies immediately, these three can span several values. */}
+          {filterKind === 'tagged' && (
+            <div className="flex flex-wrap gap-1.5 rounded-lg bg-bg p-2">
+              {members.length === 0 && <p className="text-xs text-text-dim">No one to filter by yet.</p>}
+              {members.map((m) => (
+                <label
+                  key={m.id}
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+                    filterUserIds.has(m.id) ? 'bg-primary text-white' : 'bg-surface text-text'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterUserIds.has(m.id)}
+                    onChange={() => toggleFilterUser(m.id)}
+                    className="sr-only"
+                  />
+                  {m.display_name}
+                </label>
               ))}
-            </select>
+            </div>
           )}
-          {uniqueDays.length > 1 && (
-            <select
-              value=""
-              onChange={(e) => selectByDay(e.target.value)}
-              className="shrink-0 rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
-            >
-              <option value="" disabled>
-                By day…
-              </option>
-              {uniqueDays.map((d) => (
-                <option key={d} value={d}>
-                  {formatDayLabel(d)}
-                </option>
+          {filterKind === 'event' && (
+            <div className="flex flex-wrap gap-1.5 rounded-lg bg-bg p-2">
+              {activities.map((a) => (
+                <label
+                  key={a.id}
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+                    filterEventIds.has(a.id) ? 'bg-primary text-white' : 'bg-surface text-text'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterEventIds.has(a.id)}
+                    onChange={() => toggleFilterEvent(a.id)}
+                    className="sr-only"
+                  />
+                  {a.name}
+                </label>
               ))}
-            </select>
+            </div>
+          )}
+          {filterKind === 'day' && (
+            <div className="flex flex-wrap gap-1.5 rounded-lg bg-bg p-2">
+              {uniqueDays.map((d) => (
+                <label
+                  key={d}
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${
+                    filterDayKeys.has(d) ? 'bg-primary text-white' : 'bg-surface text-text'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={filterDayKeys.has(d)}
+                    onChange={() => toggleFilterDay(d)}
+                    className="sr-only"
+                  />
+                  {formatDayLabel(d)}
+                </label>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -585,62 +681,20 @@ export function TripAlbumPage() {
         </div>
       )}
 
-      {(archiveLink || profile?.is_admin) && (
-        <div className="mt-3 rounded-xl border border-line bg-surface p-3 text-xs">
-          {editingArchiveLink ? (
-            <form onSubmit={(e) => void handleSaveArchiveLink(e)} className="flex flex-col gap-2">
-              <label className="font-medium text-text-dim">
-                Link to where full-quality photos are backed up (e.g. a shared Google Drive folder)
-              </label>
-              <input
-                type="url"
-                placeholder="https://drive.google.com/…"
-                value={archiveLinkInput}
-                onChange={(e) => setArchiveLinkInput(e.target.value)}
-                className="rounded-lg border border-line bg-bg px-2 py-1.5"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={savingArchiveLink}
-                  className="rounded-full bg-primary px-3 py-1 font-medium text-white disabled:opacity-50"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingArchiveLink(false)}
-                  className="rounded-full bg-bg px-3 py-1 font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              {archiveLink ? (
-                <a
-                  href={archiveLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full bg-bg px-3 py-1.5 font-medium text-primary"
-                >
-                  📦 Full-quality photos
-                </a>
-              ) : (
-                <p className="text-text-dim">No backup link set yet.</p>
-              )}
-              {profile?.is_admin && (
-                <button
-                  type="button"
-                  onClick={startEditingArchiveLink}
-                  className="rounded-full bg-bg px-3 py-1.5 font-medium text-text-dim"
-                >
-                  {archiveLink ? 'Edit link' : '+ Add link'}
-                </button>
-              )}
-            </div>
-          )}
+      {/* Just the view link here — editing it is an admin/setup action that
+          doesn't need to compete for attention with everyone's actual
+          reason to be on this page, so it lives down by the Archive
+          button instead (see below the photo list). */}
+      {archiveLink && (
+        <div className="mt-3">
+          <a
+            href={archiveLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-primary"
+          >
+            📦 Full-quality photos
+          </a>
         </div>
       )}
 
@@ -894,17 +948,65 @@ export function TripAlbumPage() {
         })}
       </div>
 
-      {profile?.is_admin && archivableCount > 0 && (
-        <div className="mt-4 flex justify-center">
-          <button
-            type="button"
-            disabled={!archiveLink}
-            title={archiveLink ? undefined : 'Add a backup link first, so it can be verified before archiving.'}
-            onClick={() => setShowArchiveConfirm(true)}
-            className="rounded-full bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
-          >
-            Archive {archivableCount} photo{archivableCount === 1 ? '' : 's'}
-          </button>
+      {profile?.is_admin && (all.length > 0 || archiveLink) && (
+        <div className="mt-4 flex flex-col items-center gap-2">
+          {editingArchiveLink ? (
+            <form
+              onSubmit={(e) => void handleSaveArchiveLink(e)}
+              className="w-full rounded-xl border border-line bg-surface p-3 text-xs"
+            >
+              <label className="font-medium text-text-dim">
+                Link to where full-quality photos are backed up (e.g. a shared Google Drive folder)
+              </label>
+              <input
+                type="url"
+                placeholder="https://drive.google.com/…"
+                value={archiveLinkInput}
+                onChange={(e) => setArchiveLinkInput(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-line bg-bg px-2 py-1.5"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingArchiveLink}
+                  className="rounded-full bg-primary px-3 py-1 font-medium text-white disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingArchiveLink(false)}
+                  className="rounded-full bg-bg px-3 py-1 font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {archivableCount > 0 && (
+                <button
+                  type="button"
+                  disabled={!archiveLink}
+                  title={archiveLink ? undefined : 'Add a backup link first, so it can be verified before archiving.'}
+                  onClick={() => setShowArchiveConfirm(true)}
+                  className="rounded-full bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Archive {archivableCount} photo{archivableCount === 1 ? '' : 's'}
+                </button>
+              )}
+              {/* Deliberately low-key — editing where photos are backed up
+                  is a rare admin/setup task, not something that should
+                  compete visually with the view link up top. */}
+              <button
+                type="button"
+                onClick={startEditingArchiveLink}
+                className="text-xs text-text-dim underline"
+              >
+                {archiveLink ? 'Edit photo backup link' : 'Add photo backup link'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
