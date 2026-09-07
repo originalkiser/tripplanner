@@ -245,6 +245,13 @@ export function ProfilePage() {
         Trip members &rarr;
       </Link>
 
+      <Link
+        to="/trips"
+        className="card-shadow mt-3 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
+      >
+        My trips &rarr;
+      </Link>
+
       <button
         type="button"
         onClick={() => void signOut()}

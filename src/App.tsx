@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { LoginPage } from './features/auth/LoginPage'
 import { PeoplePage } from './features/people/PeoplePage'
 import { ProfilePage } from './features/profile/ProfilePage'
+import { MyTripsPage } from './features/trips/MyTripsPage'
 import { ActivityListPage } from './features/activities/ActivityListPage'
 import { PackingListPage } from './features/packing/PackingListPage'
 import { DigestPage } from './features/digest/DigestPage'
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/digest" element={<DigestPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/people" element={<PeoplePage />} />
+                <Route path="/trips" element={<MyTripsPage />} />
                 <Route path="/album" element={<TripAlbumPage />} />
                 <Route path="/home" element={<HomePage />} />
               </Routes>
