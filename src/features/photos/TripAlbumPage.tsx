@@ -615,37 +615,27 @@ export function TripAlbumPage() {
               </div>
             </form>
           ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {archiveLink ? (
-                <a href={archiveLink} target="_blank" rel="noreferrer" className="text-primary underline">
-                  📦 Full-quality photos also saved here
+                <a
+                  href={archiveLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full bg-bg px-3 py-1.5 font-medium text-primary"
+                >
+                  📦 Full-quality photos
                 </a>
               ) : (
                 <p className="text-text-dim">No backup link set yet.</p>
               )}
               {profile?.is_admin && (
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={startEditingArchiveLink}
-                    className="rounded-full bg-bg px-3 py-1 font-medium text-text-dim"
-                  >
-                    {archiveLink ? 'Edit link' : '+ Add link'}
-                  </button>
-                  {archivableCount > 0 && (
-                    <button
-                      type="button"
-                      disabled={!archiveLink}
-                      title={
-                        archiveLink ? undefined : 'Add a backup link first, so it can be verified before archiving.'
-                      }
-                      onClick={() => setShowArchiveConfirm(true)}
-                      className="rounded-full bg-coral px-3 py-1 font-medium text-white disabled:opacity-40"
-                    >
-                      Archive {archivableCount} photo{archivableCount === 1 ? '' : 's'}
-                    </button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={startEditingArchiveLink}
+                  className="rounded-full bg-bg px-3 py-1.5 font-medium text-text-dim"
+                >
+                  {archiveLink ? 'Edit link' : '+ Add link'}
+                </button>
               )}
             </div>
           )}
@@ -901,6 +891,20 @@ export function TripAlbumPage() {
           )
         })}
       </div>
+
+      {profile?.is_admin && archivableCount > 0 && (
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            disabled={!archiveLink}
+            title={archiveLink ? undefined : 'Add a backup link first, so it can be verified before archiving.'}
+            onClick={() => setShowArchiveConfirm(true)}
+            className="rounded-full bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          >
+            Archive {archivableCount} photo{archivableCount === 1 ? '' : 's'}
+          </button>
+        </div>
+      )}
 
       <div className="fixed inset-x-0 bottom-[calc(70px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-md px-4">
         {selectMode ? (
