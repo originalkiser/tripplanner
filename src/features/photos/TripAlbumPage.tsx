@@ -8,6 +8,7 @@ import { useRecentLocationsStore } from '../../stores/recentLocationsStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { getCurrentTripId } from '../../lib/currentTrip'
 import { tripPhotoUrl, isVideoPath } from '../../lib/storage'
 import { searchLocations, reverseGeocode, milesBetween, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
@@ -109,9 +110,9 @@ export function TripAlbumPage() {
 
   useEffect(() => {
     void (async () => {
-      const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-      if (!trip) return
-      const { data: stay } = await supabase.from('stays').select('lat, lng').eq('trip_id', trip.id).maybeSingle()
+      const tripId = await getCurrentTripId()
+      if (!tripId) return
+      const { data: stay } = await supabase.from('stays').select('lat, lng').eq('trip_id', tripId).maybeSingle()
       if (stay?.lat != null && stay?.lng != null) setHomeLocation({ lat: stay.lat, lng: stay.lng })
     })()
   }, [])

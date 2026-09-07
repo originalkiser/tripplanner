@@ -38,7 +38,6 @@ export interface Database {
           name: string
           start_date: string
           end_date: string
-          is_active: boolean
           photo_archive_link: string | null
           created_by: string | null
           location: string | null
@@ -50,7 +49,6 @@ export interface Database {
           name: string
           start_date: string
           end_date: string
-          is_active?: boolean
           photo_archive_link?: string | null
           created_by?: string | null
           location?: string | null

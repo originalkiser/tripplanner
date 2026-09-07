@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getCurrentTripId } from '../lib/currentTrip'
 import type { ChangeType } from '../types/database'
 
 export interface ChangeEntry {
@@ -27,14 +28,6 @@ const SELECT_WITH_TRIP = `
   user:user_profiles(display_name)
 `
 
-let cachedTripId: string | null = null
-async function getActiveTripId(): Promise<string | null> {
-  if (cachedTripId) return cachedTripId
-  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-  cachedTripId = data?.id ?? null
-  return cachedTripId
-}
-
 interface DigestState {
   sinceLastVisit: ChangeEntry[]
   loadingSinceLastVisit: boolean
@@ -59,7 +52,7 @@ export const useDigestStore = create<DigestState>((set) => ({
       return
     }
     set({ loadingSinceLastVisit: true })
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('activity_changes')
       .select(SELECT_WITH_TRIP)
@@ -78,7 +71,7 @@ export const useDigestStore = create<DigestState>((set) => ({
 
   fetchDay: async (date) => {
     set({ loadingDay: true })
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const start = `${date}T00:00:00.000Z`
     const end = `${date}T23:59:59.999Z`
     const { data, error } = await supabase

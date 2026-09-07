@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { supabase } from '../../lib/supabase'
+import { getCurrentTripId } from '../../lib/currentTrip'
 import { useAuthStore } from '../../stores/authStore'
 import type { WifiSecurity } from '../../types/database'
 
@@ -59,12 +60,12 @@ export function WifiSection() {
 
   async function load() {
     setLoading(true)
-    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-    if (!trip) {
+    const tripId = await getCurrentTripId()
+    if (!tripId) {
       setLoading(false)
       return
     }
-    const { data } = await supabase.from('wifi_networks').select('*').eq('trip_id', trip.id).maybeSingle()
+    const { data } = await supabase.from('wifi_networks').select('*').eq('trip_id', tripId).maybeSingle()
     if (data) {
       setWifi(data)
       setSsid(data.ssid ?? '')
@@ -80,15 +81,15 @@ export function WifiSection() {
     setSaving(true)
     setError(null)
 
-    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-    if (!trip) {
+    const tripId = await getCurrentTripId()
+    if (!tripId) {
       setSaving(false)
-      setError('No active trip found.')
+      setError('No trip found.')
       return
     }
 
     const { error } = await supabase.from('wifi_networks').upsert({
-      trip_id: trip.id,
+      trip_id: tripId,
       ssid: ssid.trim() || null,
       password: password.trim() || null,
       security,

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getCurrentTripId } from '../lib/currentTrip'
 import { compressImage, compressForArchive } from '../lib/imageCompression'
 import { getPhotoTakenAt, getPhotoLocation } from '../lib/exif'
 import { reverseGeocode } from '../lib/geo'
@@ -37,14 +38,6 @@ export interface Photo {
 
 export function hasLiked(photo: Photo, userId: string): boolean {
   return photo.likes.some((l) => l.user_id === userId)
-}
-
-let cachedTripId: string | null = null
-async function getActiveTripId(): Promise<string | null> {
-  if (cachedTripId) return cachedTripId
-  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-  cachedTripId = data?.id ?? null
-  return cachedTripId
 }
 
 function extensionOf(filename: string, fallback: string): string {
@@ -142,7 +135,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   fetchAlbum: async () => {
     set({ loading: true })
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('activity_photos')
       .select(SELECT)
@@ -159,7 +152,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   fetchAll: async () => {
     set({ loading: true })
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('activity_photos')
       .select(SELECT)
@@ -175,7 +168,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
 
   upload: async (file, userId, activityId) => {
     try {
-      const tripId = await getActiveTripId()
+      const tripId = await getCurrentTripId()
       if (!tripId) return { error: 'No active trip found.' }
 
       const isVideo = file.type.startsWith('video/')
@@ -303,19 +296,16 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
   },
 
   fetchArchiveLink: async () => {
-    const { data } = await supabase
-      .from('trips')
-      .select('photo_archive_link')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle()
+    const tripId = await getCurrentTripId()
+    if (!tripId) return
+    const { data } = await supabase.from('trips').select('photo_archive_link').eq('id', tripId).maybeSingle()
     set({ archiveLink: data?.photo_archive_link ?? null })
   },
 
   setArchiveLink: async (link) => {
-    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-    if (!trip) return { error: 'No active trip found.' }
-    const { error } = await supabase.from('trips').update({ photo_archive_link: link }).eq('id', trip.id)
+    const tripId = await getCurrentTripId()
+    if (!tripId) return { error: 'No trip found.' }
+    const { error } = await supabase.from('trips').update({ photo_archive_link: link }).eq('id', tripId)
     if (error) return { error: error.message }
     set({ archiveLink: link })
     return { error: null }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { getCurrentTripId } from '../../lib/currentTrip'
 import { useAuthStore } from '../../stores/authStore'
 import { useWeatherStore } from '../../stores/weatherStore'
 import { usePollsStore, pendingPolls } from '../../stores/pollsStore'
@@ -157,12 +158,12 @@ export function HomePage() {
 
   async function load() {
     setLoading(true)
-    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-    if (!trip) {
+    const tripId = await getCurrentTripId()
+    if (!tripId) {
       setLoading(false)
       return
     }
-    const { data } = await supabase.from('stays').select('*').eq('trip_id', trip.id).maybeSingle()
+    const { data } = await supabase.from('stays').select('*').eq('trip_id', tripId).maybeSingle()
     if (data) {
       setStay(data)
       setName(data.name ?? '')
@@ -179,10 +180,10 @@ export function HomePage() {
     setSaving(true)
     setError(null)
 
-    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-    if (!trip) {
+    const tripId = await getCurrentTripId()
+    if (!tripId) {
       setSaving(false)
-      setError('No active trip found.')
+      setError('No trip found.')
       return
     }
 
@@ -201,7 +202,7 @@ export function HomePage() {
     }
 
     const { error } = await supabase.from('stays').upsert({
-      trip_id: trip.id,
+      trip_id: tripId,
       name: name.trim() || null,
       address: trimmedAddress,
       notes: notes.trim() || null,
