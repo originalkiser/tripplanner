@@ -133,11 +133,23 @@ h4 {
 }
 
 .scene-sky-day,
-.scene-sky-night {
+.scene-sky-night,
+.scene-sky-mountain-day,
+.scene-sky-mountain-night,
+.scene-sky-city-day,
+.scene-sky-city-night,
+.scene-sky-park-day,
+.scene-sky-park-night {
   flex: 0 0 69.44%;
 }
 .scene-water-day,
-.scene-water-night {
+.scene-water-night,
+.scene-ground-mountain-day,
+.scene-ground-mountain-night,
+.scene-ground-city-day,
+.scene-ground-city-night,
+.scene-ground-park-day,
+.scene-ground-park-night {
   flex: 1;
 }
 
@@ -154,6 +166,55 @@ h4 {
 .scene-water-night {
   background: linear-gradient(to bottom, #123038, #0a1a20);
   border-top: 1.5px solid rgba(35, 68, 80, 0.8);
+}
+
+/* Mountain/City/AmusementPark scene washes — same .scene-bg flex-band
+   structure as beach above (sky flex 69.44%, ground flex 1), just under
+   theme-specific class names so each theme's colors are independent and
+   none of them risk touching beach's tuned values. */
+.scene-sky-mountain-day {
+  background: linear-gradient(to bottom, #dff0f7, #a9d6e8);
+}
+.scene-ground-mountain-day {
+  background: linear-gradient(to bottom, #8fbf7a, #4f7a4a);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+.scene-sky-mountain-night {
+  background: linear-gradient(to bottom, #0d1b2e, #1b3350);
+}
+.scene-ground-mountain-night {
+  background: linear-gradient(to bottom, #1c2b22, #0f1a14);
+  border-top: 1.5px solid rgba(72, 96, 88, 0.6);
+}
+
+.scene-sky-city-day {
+  background: linear-gradient(to bottom, #cfe3ef, #9fc2d9);
+}
+.scene-ground-city-day {
+  background: linear-gradient(to bottom, #8a8f98, #4b4f58);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.35);
+}
+.scene-sky-city-night {
+  background: linear-gradient(to bottom, #170f2e, #2c1f4a);
+}
+.scene-ground-city-night {
+  background: linear-gradient(to bottom, #1a1a22, #0c0c10);
+  border-top: 1.5px solid rgba(80, 70, 110, 0.6);
+}
+
+.scene-sky-park-day {
+  background: linear-gradient(to bottom, #bfe6ff, #ffd6ea);
+}
+.scene-ground-park-day {
+  background: linear-gradient(to bottom, #e8dcc0, #cbb98f);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+.scene-sky-park-night {
+  background: linear-gradient(to bottom, #2a0f3d, #4a1f5c);
+}
+.scene-ground-park-night {
+  background: linear-gradient(to bottom, #1a1220, #0d0812);
+  border-top: 1.5px solid rgba(120, 80, 140, 0.5);
 }
 
 /* The decorative layer (sun, trees, clouds/stars) — scales uniformly and
@@ -314,6 +375,21 @@ h4 {
   }
 }
 
+/* AmusementPark scene: slow, continuous wheel rotation. transform-origin is
+   set per-instance as an inline style (SVG user units matching that
+   particular wheel's own center) rather than here, same reasoning as the
+   palm sway above — a percentage would resolve against the wheel-plus-spokes
+   group's bounding box, not its true rotational center. */
+.scene-ferris-wheel {
+  animation: scene-spin 20s linear infinite;
+}
+
+@keyframes scene-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* .scene-bg needs `display: flex` to show (its sky/water children are laid
    out with flex-basis percentages) while the content group (.scene-
    visibility, an inner <g> — see HeroScene.tsx) just needs `display: block`
@@ -364,6 +440,7 @@ h4 {
   .scene-palm .scene-fronds,
   .scene-star,
   .scene-cloud,
+  .scene-ferris-wheel,
   .sun-loader-rays,
   .sun-loader-core,
   .photo-slide-in-right,
