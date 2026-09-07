@@ -267,19 +267,20 @@ export function CreateActivityModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex h-[100dvh] flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
+    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
       {/* The card itself — not the form — is the scrolling region, with the
-          header and save button sticky within it. A fixed-height mobile
-          viewport (h-[100dvh] above) can still end up wrong once the
-          on-screen keyboard opens, since keyboards shrink the *visual*
-          viewport without most browsers shrinking dvh/fixed-position layout
-          to match — that previously left the save button stranded behind
-          the keyboard with the scrollable form unable to reach it. Making
-          the whole card a real overflow-y-auto region means touch-scroll
-          can always reach the bottom regardless of that mismatch, and the
-          sticky button lands there without needing an exact scroll
-          position. */}
-      <div className="flex max-h-full w-full max-w-md flex-col overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-surface">
+          header and save button sticky within it, so touch-scroll can
+          always reach the bottom no matter how tall the content gets.
+          Capped at 100svh (the smallest the viewport can ever be — same
+          unit AppShell's own root uses) minus the overlay's own padding,
+          rather than 100dvh/a percentage of the fixed overlay's own
+          height: those track the *current* browser-chrome/keyboard state,
+          which on some mobile browsers doesn't update fixed-position
+          layout when that state changes mid-interaction — previously
+          leaving the card taller than the actually-visible screen, clipped
+          at both ends with no correct height to scroll within. svh never
+          changes, so the cap is always honored. */}
+      <div className="flex max-h-[calc(100svh-2rem)] w-full max-w-md flex-col overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-surface">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface p-4">
           <h2 className="text-xl font-semibold text-primary">
             {isEdit ? 'Edit Activity' : logMode ? 'Log a Visit' : 'New Activity'}

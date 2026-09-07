@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'react-router-dom'
 import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { usePhotoSeenStore } from '../../stores/photoSeenStore'
+import { usePhotoSortStore, type PhotoSortMode } from '../../stores/photoSortStore'
 import { useRecentLocationsStore } from '../../stores/recentLocationsStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -13,7 +15,6 @@ import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
-type SortMode = 'uploaded-asc' | 'uploaded-desc' | 'taken-asc' | 'taken-desc'
 
 const SWIPE_THRESHOLD_PX = 50
 const DOUBLE_TAP_MS = 300
@@ -68,7 +69,8 @@ export function TripAlbumPage() {
   const [burstId, setBurstId] = useState<string | null>(null)
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTap = useRef<{ photoId: string; time: number } | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('uploaded-asc')
+  const sortMode = usePhotoSortStore((s) => s.sortMode)
+  const setSortMode = usePhotoSortStore((s) => s.setSortMode)
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const [locationQuery, setLocationQuery] = useState('')
   const [locationResults, setLocationResults] = useState<LocationResult[]>([])
@@ -82,6 +84,8 @@ export function TripAlbumPage() {
   // under, so a slow, superseded search can never clobber what's on screen.
   const locationSearchToken = useRef(0)
   const [homeLocation, setHomeLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightPhotoId = searchParams.get('photo')
 
   useEffect(() => {
     void (async () => {
@@ -115,6 +119,23 @@ export function TripAlbumPage() {
   useEffect(() => {
     markPhotosSeen()
   }, [markPhotosSeen])
+
+  // A Home notification ("so-and-so added photos" / "you were tagged")
+  // links here with ?photo=<id> — jump straight into that photo's lightbox
+  // once it's loaded instead of leaving someone to scroll/search for it.
+  useEffect(() => {
+    if (!highlightPhotoId || sorted.length === 0) return
+    const index = sorted.findIndex((p) => p.id === highlightPhotoId)
+    if (index !== -1) {
+      setLightboxIndex(index)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('photo')
+        return next
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightPhotoId, sorted.length])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -424,7 +445,7 @@ export function TripAlbumPage() {
           <span className="shrink-0 text-xs font-medium text-text-dim">Sort:</span>
           <select
             value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            onChange={(e) => setSortMode(e.target.value as PhotoSortMode)}
             className="rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
           >
             <option value="uploaded-asc">Upload time (oldest first)</option>

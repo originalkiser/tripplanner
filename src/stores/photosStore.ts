@@ -49,14 +49,20 @@ export function newPhotosSince(all: Photo[], userId: string, sinceIso: string): 
 }
 
 // Tags landed on the given user (by someone else) since the given timestamp
-// — powers the separate "you were tagged" notification.
-export function newTagsSince(all: Photo[], userId: string, sinceIso: string): PhotoTag[] {
+// — powers the separate "you were tagged" notification. Carries the photo's
+// id (not part of PhotoTag itself) so that notification can link straight
+// to the photo instead of just the album in general.
+export function newTagsSince(
+  all: Photo[],
+  userId: string,
+  sinceIso: string,
+): (PhotoTag & { photoId: string })[] {
   const since = new Date(sinceIso).getTime()
-  const tags: PhotoTag[] = []
+  const tags: (PhotoTag & { photoId: string })[] = []
   for (const photo of all) {
     for (const tag of photo.tags) {
       if (tag.user_id === userId && tag.tagged_by !== userId && new Date(tag.created_at).getTime() > since) {
-        tags.push(tag)
+        tags.push({ ...tag, photoId: photo.id })
       }
     }
   }
