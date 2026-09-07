@@ -18,6 +18,7 @@ import { resolveAssetUrl } from '../../lib/assetUrl'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon, weatherLabel } from '../../lib/weather'
 import { googleMapsAddressUrl, appleMapsAddressUrl, isIOS, searchLocations } from '../../lib/geo'
+import { PageHeader } from '../../components/layout/PageHeader'
 
 // An item still "needs" someone: uncapped and nobody's bringing it yet, or
 // capped and still short of the quantity needed.
@@ -230,10 +231,7 @@ export function HomePage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <h1 className="text-2xl font-semibold text-primary">Home</h1>
-        <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
-      </div>
+      <PageHeader title="Home" subtitle="Where the group is staying — anyone can edit this." />
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Link

@@ -176,7 +176,7 @@ function Balloon({ x, y, color }: { x: number; y: number; color: string }) {
 
 export function AmusementParkScene() {
   return (
-    <div className="scene-fixed">
+    <div className="scene-inflow">
       <div className="scene-bg scene-day">
         <div className="scene-sky-park-day" />
         <div className="scene-ground-park-day" />

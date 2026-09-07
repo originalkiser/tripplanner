@@ -12,7 +12,6 @@ import { useActivitiesStore } from '../../stores/activitiesStore'
 import { usePhotosStore } from '../../stores/photosStore'
 import { supabase } from '../../lib/supabase'
 import { getCurrentTripId } from '../../lib/currentTrip'
-import { ViewingTripBanner } from './ViewingTripBanner'
 
 // Pulls in Leaflet (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -78,16 +77,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
-      <HeroScene theme={heroTheme} />
-      <ViewingTripBanner />
       <HappeningNowBanner />
       <UpdateBanner />
       <NotificationStack />
 
+      {/* The hero scene lives in normal document flow, at the top of the
+          scrollable area — it scrolls away like any other content instead
+          of staying pinned. Each page's own sticky header (see PageHeader)
+          takes over at the top of the screen once it scrolls past. */}
       <main
         ref={mainRef}
-        className="relative z-10 flex-1 overflow-y-auto overscroll-contain pt-[var(--scene-h)]"
+        className="relative z-10 flex-1 overflow-y-auto overscroll-contain"
       >
+        <HeroScene theme={heroTheme} />
         {children}
       </main>
 

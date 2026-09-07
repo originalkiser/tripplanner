@@ -12,6 +12,7 @@ import { getCurrentTripId } from '../../lib/currentTrip'
 import { tripPhotoUrl, isVideoPath } from '../../lib/storage'
 import { searchLocations, reverseGeocode, milesBetween, type LocationResult } from '../../lib/geo'
 import { downloadPhoto, downloadPhotosAsZip } from '../../lib/downloadPhotos'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
 
@@ -487,21 +488,21 @@ export function TripAlbumPage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-32">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 flex items-start justify-between gap-2 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
-          <p className="mt-1 text-sm text-text-dim">Every photo and video from the trip, in time order.</p>
-        </div>
-        {all.length > 0 && (
-          <button
-            type="button"
-            onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
-          >
-            {selectMode ? 'Cancel' : 'Select'}
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Trip Album"
+        subtitle="Every photo and video from the trip, in time order."
+        action={
+          all.length > 0 && (
+            <button
+              type="button"
+              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+              className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
+            >
+              {selectMode ? 'Cancel' : 'Select'}
+            </button>
+          )
+        }
+      />
 
       {all.length > 1 && (
         <div className="mt-3 flex items-center gap-2">

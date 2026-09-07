@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
 import { useTripsStore } from '../../stores/tripsStore'
 import { getCurrentTripId } from '../../lib/currentTrip'
 import { resolveAssetUrl } from '../../lib/assetUrl'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { Database } from '../../types/database'
 
 type Profile = Database['trip']['Tables']['user_profiles']['Row']
@@ -103,12 +103,7 @@ export function PeoplePage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-8">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <Link to="/profile" className="text-sm text-primary underline">
-          &larr; Profile
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-primary">Trip Members</h1>
-      </div>
+      <PageHeader title="Trip Members" backTo="/profile" backLabel="Profile" />
 
       <section className="card-shadow mb-6 mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Add someone</h2>

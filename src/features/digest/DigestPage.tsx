@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useDigestStore } from '../../stores/digestStore'
 import { ActivityQuickView } from '../activities/ActivityQuickView'
+import { PageHeader } from '../../components/layout/PageHeader'
 import { CHANGE_VERB } from './changeLabels'
 import { groupChangeEntries, groupSummary } from './groupChanges'
 
@@ -39,9 +40,7 @@ export function DigestPage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <h1 className="text-2xl font-semibold text-primary">Daily Digest</h1>
-      </div>
+      <PageHeader title="Daily Digest" />
 
       <div className="mt-3 flex items-center justify-between">
         <button

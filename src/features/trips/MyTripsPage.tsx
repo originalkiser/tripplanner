@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { getStoredCurrentTripId, setCurrentTripId, pickCurrentTrip, pickUpcomingTrip, pickDefaultTrip } from '../../lib/currentTrip'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { CreateTripModal } from './CreateTripModal'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -108,16 +109,18 @@ export function MyTripsPage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-8">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 flex items-center justify-between gap-2 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <h1 className="text-2xl font-semibold text-primary">My Trips</h1>
-        <button
-          type="button"
-          onClick={() => setShowCreate(true)}
-          className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white"
-        >
-          + Create trip
-        </button>
-      </div>
+      <PageHeader
+        title="My Trips"
+        action={
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white"
+          >
+            + Create trip
+          </button>
+        }
+      />
 
       {myTrips.length === 0 && (
         <p className="mt-4 text-center text-sm text-text-dim">

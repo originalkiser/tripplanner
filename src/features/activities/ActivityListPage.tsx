@@ -9,6 +9,7 @@ import { DigestBanner } from '../digest/DigestBanner'
 import { TodayWeather } from './TodayWeather'
 import { TRIP_DAYS } from '../../lib/days'
 import { weatherIcon } from '../../lib/weather'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { ActivityType } from '../../types/database'
 
 const CreateActivityModal = lazy(() =>
@@ -75,9 +76,10 @@ export function ActivityListPage() {
 
   return (
     <div className="mx-auto max-w-6xl pb-24">
-      <div className="sticky top-0 z-20 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl font-semibold text-primary">Plans</h1>
+      <PageHeader
+        title="Plans"
+        bleed={false}
+        action={
           <div className="flex rounded-full bg-surface-2 p-0.5 text-xs font-medium">
             <button
               type="button"
@@ -94,8 +96,8 @@ export function ActivityListPage() {
               Calendar
             </button>
           </div>
-        </div>
-
+        }
+      >
         <div className="mt-3">
           <select
             value={typeFilter}
@@ -108,7 +110,7 @@ export function ActivityListPage() {
             <option value="food_and_activity">Food & Activity</option>
           </select>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="p-4">
         <TodayWeather />

@@ -5,6 +5,7 @@ import { usePackingStore } from '../../stores/packingStore'
 import { supabase } from '../../lib/supabase'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PackingItemCard } from './PackingItemCard'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -125,12 +126,11 @@ export function PackingListPage() {
 
   return (
     <div className={`mx-auto max-w-6xl pb-24 ${mode === 'private' ? 'bg-coral/5' : ''}`}>
-      <div className="sticky top-0 z-20 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className={`text-2xl font-semibold ${mode === 'private' ? 'text-coral' : 'text-primary'}`}>
-            Packing List
-          </h1>
-        </div>
+      <PageHeader
+        title="Packing List"
+        titleClassName={`text-2xl font-semibold ${mode === 'private' ? 'text-coral' : 'text-primary'}`}
+        bleed={false}
+      >
         <div className="mt-3 flex rounded-full bg-surface-2 p-0.5 text-sm font-medium">
           <button
             type="button"
@@ -147,7 +147,7 @@ export function PackingListPage() {
             Private
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="p-4">
         {mode === 'private' && (
