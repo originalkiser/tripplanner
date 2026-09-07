@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import type { HeroTheme } from '../components/HeroScene'
 
 export interface TripMember {
   trip_id: string
@@ -61,6 +62,7 @@ interface TripsState {
     createdBy: string
     stay: StayInput
     inviteUserIds: string[]
+    heroTheme: HeroTheme
   }) => Promise<{ error: string | null; tripId?: string }>
   setMemberRole: (tripId: string, userId: string, role: 'admin' | 'member') => Promise<{ error: string | null }>
   updateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
@@ -120,6 +122,7 @@ export const useTripsStore = create<TripsState>((set, get) => ({
         end_date: input.endDate,
         created_by: input.createdBy,
         is_active: false,
+        hero_theme: input.heroTheme,
       })
       .select('id')
       .single()

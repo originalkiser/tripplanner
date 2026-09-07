@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { HeroScene } from '../HeroScene'
+import { HeroScene, type HeroTheme } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
 import { HappeningNowBanner } from '../HappeningNowBanner'
 import { NotificationStack } from '../NotificationStack'
@@ -10,6 +10,7 @@ import { usePendingPhotoCount } from '../../features/photos/usePendingPhotoCount
 import { useTaggedPhotoCount } from '../../features/photos/useTaggedPhotoCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { usePhotosStore } from '../../stores/photosStore'
+import { supabase } from '../../lib/supabase'
 
 // Pulls in Leaflet (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -46,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const fetchAllPhotos = usePhotosStore((s) => s.fetchAll)
   const mainRef = useRef<HTMLElement>(null)
+  const [heroTheme, setHeroTheme] = useState<HeroTheme>('beach')
 
   useEffect(() => {
     void fetchActivities()
@@ -54,6 +56,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     void fetchAllPhotos()
   }, [fetchAllPhotos])
+
+  useEffect(() => {
+    void supabase
+      .from('trips')
+      .select('hero_theme')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setHeroTheme(data?.hero_theme ?? 'beach'))
+  }, [])
 
   // Each page starts back at the top (hero banner showing, sticky header
   // not yet collapsed) rather than inheriting whatever scroll position was
@@ -65,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
-      <HeroScene />
+      <HeroScene theme={heroTheme} />
       <HappeningNowBanner />
       <UpdateBanner />
       <NotificationStack />

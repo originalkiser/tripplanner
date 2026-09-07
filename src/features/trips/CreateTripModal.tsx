@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTripsStore, type StayInput } from '../../stores/tripsStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { HeroScene, type HeroTheme } from '../../components/HeroScene'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -11,6 +12,13 @@ const STAY_TYPES: { value: NonNullable<StayInput['stayType']>; label: string }[]
   { value: 'apartment', label: 'Apartment' },
   { value: 'hotel', label: 'Hotel' },
   { value: 'other', label: 'Other' },
+]
+
+const HERO_THEMES: { value: HeroTheme; label: string }[] = [
+  { value: 'beach', label: 'Beach' },
+  { value: 'mountain', label: 'Mountain' },
+  { value: 'city', label: 'City' },
+  { value: 'amusement_park', label: 'Amusement Park' },
 ]
 
 interface PendingEmailInvite {
@@ -32,6 +40,7 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
   const [stayAddress, setStayAddress] = useState('')
   const [checkInAt, setCheckInAt] = useState('')
   const [checkOutAt, setCheckOutAt] = useState('')
+  const [heroTheme, setHeroTheme] = useState<HeroTheme>('beach')
 
   const [knownUsers, setKnownUsers] = useState<Member[]>([])
   const [selectedKnownIds, setSelectedKnownIds] = useState<Set<string>>(new Set())
@@ -132,6 +141,7 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
       createdBy: profile.id,
       stay,
       inviteUserIds: [...selectedKnownIds, ...newUserIds],
+      heroTheme,
     })
 
     setSaving(false)
@@ -239,6 +249,32 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
                   />
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium">Banner theme</p>
+            {/* HeroScene's own top-level element is position:fixed to the
+                real viewport — the transform below gives this box its own
+                containing block (per the CSS spec, an ancestor with a
+                transform becomes the containing block for a fixed-position
+                descendant), which confines it to this preview instead. */}
+            <div className="relative h-16 w-full overflow-hidden rounded-lg" style={{ transform: 'translateZ(0)' }}>
+              <HeroScene theme={heroTheme} />
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {HERO_THEMES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setHeroTheme(t.value)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    heroTheme === t.value ? 'bg-primary text-white' : 'bg-bg text-text-dim'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
           </div>
 
