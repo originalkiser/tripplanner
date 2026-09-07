@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { HeroScene } from '../HeroScene'
 import { UpdateBanner } from '../UpdateBanner'
@@ -45,6 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     pendingPollCount + pendingInviteCount + pendingPhotoCount + (taggedPhotoCount > 0 ? 1 : 0)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const fetchAllPhotos = usePhotosStore((s) => s.fetchAll)
+  const mainRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     void fetchActivities()
@@ -54,6 +55,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     void fetchAllPhotos()
   }, [fetchAllPhotos])
 
+  // Each page starts back at the top (hero banner showing, sticky header
+  // not yet collapsed) rather than inheriting whatever scroll position was
+  // left on the previous page — <main> persists across route changes
+  // (only its children swap), so its scrollTop otherwise carries over.
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0)
+  }, [location.pathname])
+
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
       <HeroScene />
@@ -61,7 +70,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <UpdateBanner />
       <NotificationStack />
 
-      <main className="relative z-10 flex-1 overflow-y-auto overscroll-contain pt-[var(--scene-h)]">
+      <main
+        ref={mainRef}
+        className="relative z-10 flex-1 overflow-y-auto overscroll-contain pt-[var(--scene-h)]"
+      >
         {children}
       </main>
 

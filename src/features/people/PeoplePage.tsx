@@ -75,12 +75,14 @@ export function PeoplePage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-8">
-      <Link to="/profile" className="text-sm text-primary underline">
-        &larr; Profile
-      </Link>
-      <h1 className="mb-4 mt-2 text-2xl font-semibold text-primary">Trip Members</h1>
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
+        <Link to="/profile" className="text-sm text-primary underline">
+          &larr; Profile
+        </Link>
+        <h1 className="mt-2 text-2xl font-semibold text-primary">Trip Members</h1>
+      </div>
 
-      <section className="card-shadow mb-6 rounded-xl border border-line bg-surface p-4">
+      <section className="card-shadow mb-6 mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Add someone</h2>
         <form onSubmit={invite} className="flex flex-col gap-3">
           <input

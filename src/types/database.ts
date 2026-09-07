@@ -40,6 +40,9 @@ export interface Database {
           end_date: string
           is_active: boolean
           photo_archive_link: string | null
+          created_by: string | null
+          location: string | null
+          hero_theme: 'beach' | 'mountain' | 'city' | 'amusement_park'
           created_at: string
         }
         Insert: {
@@ -49,9 +52,38 @@ export interface Database {
           end_date: string
           is_active?: boolean
           photo_archive_link?: string | null
+          created_by?: string | null
+          location?: string | null
+          hero_theme?: 'beach' | 'mountain' | 'city' | 'amusement_park'
           created_at?: string
         }
         Update: Partial<Database['trip']['Tables']['trips']['Insert']>
+        Relationships: []
+      }
+      trip_members: {
+        Row: {
+          trip_id: string
+          user_id: string
+          role: 'admin' | 'member'
+          arrival_date: string | null
+          departure_date: string | null
+          adults_count: number
+          children_count: number
+          allergies: string | null
+          joined_at: string
+        }
+        Insert: {
+          trip_id: string
+          user_id: string
+          role?: 'admin' | 'member'
+          arrival_date?: string | null
+          departure_date?: string | null
+          adults_count?: number
+          children_count?: number
+          allergies?: string | null
+          joined_at?: string
+        }
+        Update: Partial<Database['trip']['Tables']['trip_members']['Insert']>
         Relationships: []
       }
       user_profiles: {
@@ -257,6 +289,9 @@ export interface Database {
           link_url: string | null
           lat: number | null
           lng: number | null
+          stay_type: 'house' | 'apartment' | 'hotel' | 'other' | null
+          check_in_at: string | null
+          check_out_at: string | null
           updated_by: string | null
           updated_at: string
         }
@@ -268,6 +303,9 @@ export interface Database {
           link_url?: string | null
           lat?: number | null
           lng?: number | null
+          stay_type?: 'house' | 'apartment' | 'hotel' | 'other' | null
+          check_in_at?: string | null
+          check_out_at?: string | null
           updated_by?: string | null
           updated_at?: string
         }

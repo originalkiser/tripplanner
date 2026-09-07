@@ -64,6 +64,11 @@ interface PackingState {
     quantityNeeded: number | null,
     createdBy: string,
   ) => Promise<{ error: string | null }>
+  updateItem: (
+    itemId: string,
+    listId: string,
+    fields: { name: string; quantityNeeded: number | null },
+  ) => Promise<{ error: string | null }>
   softDeleteItem: (itemId: string, listId: string, userId: string) => Promise<{ error: string | null }>
   restoreItem: (itemId: string, listId: string) => Promise<{ error: string | null }>
   addBringer: (
@@ -165,6 +170,16 @@ export const usePackingStore = create<PackingState>((set, get) => ({
     const { error } = await supabase
       .from('packing_items')
       .insert({ packing_list_id: listId, name, quantity_needed: quantityNeeded, created_by: createdBy })
+    if (error) return { error: error.message }
+    await get().fetchItems(listId)
+    return { error: null }
+  },
+
+  updateItem: async (itemId, listId, fields) => {
+    const { error } = await supabase
+      .from('packing_items')
+      .update({ name: fields.name, quantity_needed: fields.quantityNeeded })
+      .eq('id', itemId)
     if (error) return { error: error.message }
     await get().fetchItems(listId)
     return { error: null }
