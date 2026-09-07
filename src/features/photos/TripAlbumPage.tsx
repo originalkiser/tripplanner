@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'react-router-dom'
 import { usePhotosStore, hasLiked, type Photo } from '../../stores/photosStore'
 import { usePhotoSeenStore } from '../../stores/photoSeenStore'
+import { usePhotoSortStore, type PhotoSortMode } from '../../stores/photoSortStore'
 import { useRecentLocationsStore } from '../../stores/recentLocationsStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -13,7 +15,6 @@ import { HeartIcon } from './HeartIcon'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
-type SortMode = 'uploaded-asc' | 'uploaded-desc' | 'taken-asc' | 'taken-desc'
 
 const SWIPE_THRESHOLD_PX = 50
 const DOUBLE_TAP_MS = 300
@@ -45,8 +46,22 @@ function formatDayLabel(dayKey: string): string {
 
 export function TripAlbumPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { all, loading, fetchAll, upload, remove, linkToActivity, addTag, removeTag, toggleLike, setPhotoLocation } =
-    usePhotosStore()
+  const {
+    all,
+    loading,
+    fetchAll,
+    upload,
+    remove,
+    linkToActivity,
+    addTag,
+    removeTag,
+    toggleLike,
+    setPhotoLocation,
+    archiveLink,
+    fetchArchiveLink,
+    setArchiveLink,
+    archivePhoto,
+  } = usePhotosStore()
   const activities = useActivitiesStore((s) => s.activities)
   const fetchActivities = useActivitiesStore((s) => s.fetchActivities)
   const markPhotosSeen = usePhotoSeenStore((s) => s.markSeen)
@@ -65,10 +80,17 @@ export function TripAlbumPage() {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null)
+  const [editingArchiveLink, setEditingArchiveLink] = useState(false)
+  const [archiveLinkInput, setArchiveLinkInput] = useState('')
+  const [savingArchiveLink, setSavingArchiveLink] = useState(false)
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const [archiveConfirmChecked, setArchiveConfirmChecked] = useState(false)
+  const [archiving, setArchiving] = useState<{ done: number; total: number } | null>(null)
   const [burstId, setBurstId] = useState<string | null>(null)
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTap = useRef<{ photoId: string; time: number } | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('uploaded-asc')
+  const sortMode = usePhotoSortStore((s) => s.sortMode)
+  const setSortMode = usePhotoSortStore((s) => s.setSortMode)
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
   const [locationQuery, setLocationQuery] = useState('')
   const [locationResults, setLocationResults] = useState<LocationResult[]>([])
@@ -82,6 +104,8 @@ export function TripAlbumPage() {
   // under, so a slow, superseded search can never clobber what's on screen.
   const locationSearchToken = useRef(0)
   const [homeLocation, setHomeLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightPhotoId = searchParams.get('photo')
 
   useEffect(() => {
     void (async () => {
@@ -103,18 +127,36 @@ export function TripAlbumPage() {
   useEffect(() => {
     void fetchAll()
     void fetchActivities()
+    void fetchArchiveLink()
     void supabase
       .from('user_profiles')
       .select('*')
       .order('display_name')
       .then(({ data }) => setMembers(data ?? []))
-  }, [fetchAll, fetchActivities])
+  }, [fetchAll, fetchActivities, fetchArchiveLink])
 
   // Opening the album is what "reading" a new-photos notification means —
   // clear it the moment someone lands here, not just when they act on it.
   useEffect(() => {
     markPhotosSeen()
   }, [markPhotosSeen])
+
+  // A Home notification ("so-and-so added photos" / "you were tagged")
+  // links here with ?photo=<id> — jump straight into that photo's lightbox
+  // once it's loaded instead of leaving someone to scroll/search for it.
+  useEffect(() => {
+    if (!highlightPhotoId || sorted.length === 0) return
+    const index = sorted.findIndex((p) => p.id === highlightPhotoId)
+    if (index !== -1) {
+      setLightboxIndex(index)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('photo')
+        return next
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightPhotoId, sorted.length])
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -371,6 +413,47 @@ export function TripAlbumPage() {
     }
   }
 
+  async function handleExportAll() {
+    if (all.length === 0) return
+    setZipping({ done: 0, total: all.length })
+    try {
+      await downloadPhotosAsZip(all, (done, total) => setZipping({ done, total }))
+    } finally {
+      setZipping(null)
+    }
+  }
+
+  function startEditingArchiveLink() {
+    setArchiveLinkInput(archiveLink ?? '')
+    setEditingArchiveLink(true)
+  }
+
+  async function handleSaveArchiveLink(e: React.FormEvent) {
+    e.preventDefault()
+    setSavingArchiveLink(true)
+    await setArchiveLink(archiveLinkInput.trim() || null)
+    setSavingArchiveLink(false)
+    setEditingArchiveLink(false)
+  }
+
+  // Images only — there's no client-side video re-encoding available, so a
+  // video's stored file is left exactly as-is regardless of archiving.
+  const archivableCount = all.filter((p) => !isVideoPath(p.storage_path) && !p.archived_at).length
+
+  async function handleArchivePhotos() {
+    const eligible = all.filter((p) => !isVideoPath(p.storage_path) && !p.archived_at)
+    if (eligible.length === 0) return
+    setArchiving({ done: 0, total: eligible.length })
+    for (let i = 0; i < eligible.length; i++) {
+      await archivePhoto(eligible[i])
+      setArchiving({ done: i + 1, total: eligible.length })
+    }
+    await fetchAll()
+    setArchiving(null)
+    setShowArchiveConfirm(false)
+    setArchiveConfirmChecked(false)
+  }
+
   // Quick export filters: jump straight into select mode with the matching
   // photos already checked, rather than making people tap "Select" first
   // and then pick photos out one at a time.
@@ -424,7 +507,7 @@ export function TripAlbumPage() {
           <span className="shrink-0 text-xs font-medium text-text-dim">Sort:</span>
           <select
             value={sortMode}
-            onChange={(e) => setSortMode(e.target.value as SortMode)}
+            onChange={(e) => setSortMode(e.target.value as PhotoSortMode)}
             className="rounded-full border border-line bg-bg px-3 py-1.5 text-xs font-medium text-text-dim"
           >
             <option value="uploaded-asc">Upload time (oldest first)</option>
@@ -483,6 +566,88 @@ export function TripAlbumPage() {
                 </option>
               ))}
             </select>
+          )}
+        </div>
+      )}
+
+      {all.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExportAll()}
+            disabled={zipping != null}
+            className="shrink-0 rounded-full bg-bg px-3 py-1.5 text-xs font-medium text-text-dim disabled:opacity-50"
+          >
+            {zipping ? `Zipping ${zipping.done}/${zipping.total}…` : '⬇ Export all as .zip'}
+          </button>
+        </div>
+      )}
+
+      {(archiveLink || profile?.is_admin) && (
+        <div className="mt-3 rounded-xl border border-line bg-surface p-3 text-xs">
+          {editingArchiveLink ? (
+            <form onSubmit={(e) => void handleSaveArchiveLink(e)} className="flex flex-col gap-2">
+              <label className="font-medium text-text-dim">
+                Link to where full-quality photos are backed up (e.g. a shared Google Drive folder)
+              </label>
+              <input
+                type="url"
+                placeholder="https://drive.google.com/…"
+                value={archiveLinkInput}
+                onChange={(e) => setArchiveLinkInput(e.target.value)}
+                className="rounded-lg border border-line bg-bg px-2 py-1.5"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingArchiveLink}
+                  className="rounded-full bg-primary px-3 py-1 font-medium text-white disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingArchiveLink(false)}
+                  className="rounded-full bg-bg px-3 py-1 font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {archiveLink ? (
+                <a href={archiveLink} target="_blank" rel="noreferrer" className="text-primary underline">
+                  📦 Full-quality photos also saved here
+                </a>
+              ) : (
+                <p className="text-text-dim">No backup link set yet.</p>
+              )}
+              {profile?.is_admin && (
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={startEditingArchiveLink}
+                    className="rounded-full bg-bg px-3 py-1 font-medium text-text-dim"
+                  >
+                    {archiveLink ? 'Edit link' : '+ Add link'}
+                  </button>
+                  {archivableCount > 0 && (
+                    <button
+                      type="button"
+                      disabled={!archiveLink}
+                      title={
+                        archiveLink ? undefined : 'Add a backup link first, so it can be verified before archiving.'
+                      }
+                      onClick={() => setShowArchiveConfirm(true)}
+                      className="rounded-full bg-coral px-3 py-1 font-medium text-white disabled:opacity-40"
+                    >
+                      Archive {archivableCount} photo{archivableCount === 1 ? '' : 's'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -563,6 +728,14 @@ export function TripAlbumPage() {
                 {burstId === photo.id && (
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
                     <HeartIcon filled className="heart-burst h-20 w-20 drop-shadow-lg" />
+                  </span>
+                )}
+                {photo.archived_at && (
+                  <span
+                    title="Archived — replaced with a small compressed preview"
+                    className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-0.5 text-[11px] text-white"
+                  >
+                    📦 Archived
                   </span>
                 )}
               </button>
@@ -871,6 +1044,70 @@ export function TripAlbumPage() {
                   Delete
                 </button>
               )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {showArchiveConfirm &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => !archiving && setShowArchiveConfirm(false)}
+          >
+            <div
+              className="card-shadow w-full max-w-sm rounded-2xl bg-surface p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-heading text-lg font-semibold text-coral">Archive {archivableCount} photos?</h3>
+              <p className="mt-2 text-sm text-text-dim">
+                This replaces each stored photo with a small, heavily compressed preview to free up storage.
+                It's permanent — there's no getting the original quality back afterward. Videos aren't
+                affected (they're left exactly as they are).
+              </p>
+              <p className="mt-2 text-sm">
+                Backup link:{' '}
+                <a href={archiveLink ?? undefined} target="_blank" rel="noreferrer" className="text-primary underline">
+                  {archiveLink}
+                </a>
+              </p>
+              <label className="mt-3 flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={archiveConfirmChecked}
+                  disabled={!!archiving}
+                  onChange={(e) => setArchiveConfirmChecked(e.target.checked)}
+                  className="mt-0.5"
+                />
+                I've verified every photo is saved at the link above.
+              </label>
+              {archiving && (
+                <p className="mt-3 text-sm text-text-dim">
+                  Archiving {archiving.done}/{archiving.total}…
+                </p>
+              )}
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!archiveConfirmChecked || !!archiving}
+                  onClick={() => void handleArchivePhotos()}
+                  className="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {archiving ? 'Archiving…' : 'Archive photos'}
+                </button>
+                {!archiving && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowArchiveConfirm(false)
+                      setArchiveConfirmChecked(false)
+                    }}
+                    className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </div>
           </div>,
           document.body,

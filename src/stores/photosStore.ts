@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
-import { compressImage } from '../lib/imageCompression'
+import { compressImage, compressForArchive } from '../lib/imageCompression'
 import { getPhotoTakenAt, getPhotoLocation } from '../lib/exif'
 import { reverseGeocode } from '../lib/geo'
+import { tripPhotoUrl } from '../lib/storage'
 
 export interface PhotoTag {
   user_id: string
@@ -26,6 +27,7 @@ export interface Photo {
   location_name: string | null
   location_lat: number | null
   location_lng: number | null
+  archived_at: string | null
   uploader: { display_name: string } | null
   activity: { id: string; name: string } | null
   tags: PhotoTag[]
@@ -49,14 +51,20 @@ export function newPhotosSince(all: Photo[], userId: string, sinceIso: string): 
 }
 
 // Tags landed on the given user (by someone else) since the given timestamp
-// — powers the separate "you were tagged" notification.
-export function newTagsSince(all: Photo[], userId: string, sinceIso: string): PhotoTag[] {
+// — powers the separate "you were tagged" notification. Carries the photo's
+// id (not part of PhotoTag itself) so that notification can link straight
+// to the photo instead of just the album in general.
+export function newTagsSince(
+  all: Photo[],
+  userId: string,
+  sinceIso: string,
+): (PhotoTag & { photoId: string })[] {
   const since = new Date(sinceIso).getTime()
-  const tags: PhotoTag[] = []
+  const tags: (PhotoTag & { photoId: string })[] = []
   for (const photo of all) {
     for (const tag of photo.tags) {
       if (tag.user_id === userId && tag.tagged_by !== userId && new Date(tag.created_at).getTime() > since) {
-        tags.push(tag)
+        tags.push({ ...tag, photoId: photo.id })
       }
     }
   }
@@ -65,7 +73,7 @@ export function newTagsSince(all: Photo[], userId: string, sinceIso: string): Ph
 
 const SELECT = `
   id, activity_id, user_id, storage_path, caption, created_at, taken_at,
-  location_name, location_lat, location_lng,
+  location_name, location_lat, location_lng, archived_at,
   uploader:user_profiles!user_id(display_name),
   activity:activities(id, name),
   tags:photo_tags(user_id, tagged_by, created_at, profile:user_profiles!user_id(display_name)),
@@ -77,6 +85,7 @@ interface PhotosState {
   album: Photo[]
   all: Photo[]
   loading: boolean
+  archiveLink: string | null
   fetchForActivity: (activityId: string) => Promise<void>
   fetchAlbum: () => Promise<void>
   fetchAll: () => Promise<void>
@@ -90,6 +99,14 @@ interface PhotosState {
     photo: Photo,
     location: { name: string | null; lat: number | null; lng: number | null },
   ) => Promise<{ error: string | null }>
+  fetchArchiveLink: () => Promise<void>
+  setArchiveLink: (link: string | null) => Promise<{ error: string | null }>
+  // Re-compresses the stored image down to a small preview and marks it
+  // archived. Does not touch any other column, and does not refetch —
+  // callers run this across many photos in a loop and refresh once at the
+  // end. Video isn't supported (no client-side re-encoding available), so
+  // callers should filter those out before calling this.
+  archivePhoto: (photo: Photo) => Promise<{ error: string | null }>
 }
 
 export const usePhotosStore = create<PhotosState>((set, get) => ({
@@ -97,6 +114,7 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
   album: [],
   all: [],
   loading: false,
+  archiveLink: null,
 
   fetchForActivity: async (activityId) => {
     const { data, error } = await supabase
@@ -265,5 +283,48 @@ export const usePhotosStore = create<PhotosState>((set, get) => ({
     await get().fetchAll()
 
     return { error: null }
+  },
+
+  fetchArchiveLink: async () => {
+    const { data } = await supabase
+      .from('trips')
+      .select('photo_archive_link')
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+    set({ archiveLink: data?.photo_archive_link ?? null })
+  },
+
+  setArchiveLink: async (link) => {
+    const { data: trip } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+    if (!trip) return { error: 'No active trip found.' }
+    const { error } = await supabase.from('trips').update({ photo_archive_link: link }).eq('id', trip.id)
+    if (error) return { error: error.message }
+    set({ archiveLink: link })
+    return { error: null }
+  },
+
+  archivePhoto: async (photo) => {
+    try {
+      const res = await fetch(tripPhotoUrl(photo.storage_path))
+      if (!res.ok) return { error: `Couldn't fetch the original (${res.status}).` }
+      const original = await res.blob()
+      const compressed = await compressForArchive(original)
+
+      const { error: uploadError } = await supabase.storage
+        .from('trip-photos')
+        .upload(photo.storage_path, compressed, { contentType: 'image/jpeg', upsert: true })
+      if (uploadError) return { error: uploadError.message }
+
+      const { error } = await supabase
+        .from('activity_photos')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', photo.id)
+      if (error) return { error: error.message }
+
+      return { error: null }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : 'Archive failed' }
+    }
   },
 }))

@@ -29,6 +29,9 @@ interface PhotoNotificationGroup {
   userId: string
   name: string
   count: number
+  // The earliest new photo from this uploader — clicking the notification
+  // jumps straight to it instead of just opening the album in general.
+  firstPhotoId: string
 }
 
 // One card per uploader rather than one per photo — someone dropping in ten
@@ -38,7 +41,13 @@ function groupPhotosByUploader(photos: ReturnType<typeof newPhotosSince>): Photo
   for (const photo of photos) {
     const existing = groups.find((g) => g.userId === photo.user_id)
     if (existing) existing.count += 1
-    else groups.push({ userId: photo.user_id, name: photo.uploader?.display_name ?? 'Someone', count: 1 })
+    else
+      groups.push({
+        userId: photo.user_id,
+        name: photo.uploader?.display_name ?? 'Someone',
+        count: 1,
+        firstPhotoId: photo.id,
+      })
   }
   return groups
 }
@@ -83,7 +92,8 @@ export function HomePage() {
   const newPhotoGroups = profile
     ? groupPhotosByUploader(newPhotosSince(allPhotos, profile.id, photoLastSeenAt))
     : []
-  const myNewTagCount = profile ? newTagsSince(allPhotos, profile.id, photoLastSeenAt).length : 0
+  const myNewTags = profile ? newTagsSince(allPhotos, profile.id, photoLastSeenAt) : []
+  const myNewTagCount = myNewTags.length
   const notificationCount =
     pendingPollCount + pendingInviteCount + newPhotoGroups.length + (myNewTagCount > 0 ? 1 : 0)
 
@@ -388,7 +398,7 @@ export function HomePage() {
             {newPhotoGroups.map((g) => (
               <Link
                 key={g.userId}
-                to="/album"
+                to={`/album?photo=${g.firstPhotoId}`}
                 className="card-shadow block rounded-xl border border-line bg-surface p-3"
               >
                 <p className="text-xs font-medium text-text-dim">📸 New photos</p>
@@ -398,7 +408,10 @@ export function HomePage() {
               </Link>
             ))}
             {myNewTagCount > 0 && (
-              <Link to="/album" className="card-shadow block rounded-xl border border-line bg-surface p-3">
+              <Link
+                to={`/album?photo=${myNewTags[0].photoId}`}
+                className="card-shadow block rounded-xl border border-line bg-surface p-3"
+              >
                 <p className="text-xs font-medium text-text-dim">🏷️ Tagged</p>
                 <h3 className="font-heading text-base font-semibold">
                   You were tagged in {myNewTagCount > 1 ? `${myNewTagCount} photos` : 'a photo'}
