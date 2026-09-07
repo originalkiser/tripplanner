@@ -11,6 +11,8 @@ import { useTaggedPhotoCount } from '../../features/photos/useTaggedPhotoCount'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { usePhotosStore } from '../../stores/photosStore'
 import { supabase } from '../../lib/supabase'
+import { getCurrentTripId } from '../../lib/currentTrip'
+import { ViewingTripBanner } from './ViewingTripBanner'
 
 // Pulls in Leaflet (for the location-confirm preview) — keep it out of the
 // initial bundle since most screens won't open the modal.
@@ -58,13 +60,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [fetchAllPhotos])
 
   useEffect(() => {
-    void supabase
-      .from('trips')
-      .select('hero_theme')
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => setHeroTheme(data?.hero_theme ?? 'beach'))
+    void (async () => {
+      const tripId = await getCurrentTripId()
+      if (!tripId) return
+      const { data } = await supabase.from('trips').select('hero_theme').eq('id', tripId).maybeSingle()
+      setHeroTheme(data?.hero_theme ?? 'beach')
+    })()
   }, [])
 
   // Each page starts back at the top (hero banner showing, sticky header
@@ -78,6 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-bg text-text">
       <HeroScene theme={heroTheme} />
+      <ViewingTripBanner />
       <HappeningNowBanner />
       <UpdateBanner />
       <NotificationStack />

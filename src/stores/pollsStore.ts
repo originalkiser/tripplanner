@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getCurrentTripId } from '../lib/currentTrip'
 
 export interface PollOption {
   id: string
@@ -50,13 +51,6 @@ const SELECT_WITH_TRIP = `
   votes:poll_votes(poll_id, user_id, option_id, not_interested, profile:user_profiles!user_id(display_name))
 `
 
-let cachedTripId: string | null = null
-async function getActiveTripId(): Promise<string | null> {
-  if (cachedTripId) return cachedTripId
-  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-  cachedTripId = data?.id ?? null
-  return cachedTripId
-}
 
 interface PollsState {
   byActivity: Record<string, Poll | undefined>
@@ -93,7 +87,7 @@ export const usePollsStore = create<PollsState>((set, get) => ({
   },
 
   fetchAllForUser: async () => {
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('activity_polls')
       .select(SELECT_WITH_TRIP)

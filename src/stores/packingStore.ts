@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getCurrentTripId } from '../lib/currentTrip'
 import type { PackingBringerStatus, PackingListKind } from '../types/database'
 
 export interface PackingBringer {
@@ -112,7 +113,7 @@ export const usePackingStore = create<PackingState>((set, get) => ({
     // private lists this user belongs to, but not to a specific trip — the
     // active-trip filter below is what keeps a second trip's packing lists
     // from being mixed in here.
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('packing_lists')
       .select('id, trip_id, kind, name, created_by, created_at')
@@ -156,7 +157,7 @@ export const usePackingStore = create<PackingState>((set, get) => ({
 
   createPrivateList: async (name, createdBy) => {
     const list = get().lists[0]
-    const tripId = list?.trip_id ?? (await getActiveTripId())
+    const tripId = list?.trip_id ?? (await getCurrentTripId())
     if (!tripId) return { error: 'No active trip found.' }
 
     const { data, error } = await supabase
@@ -292,11 +293,3 @@ export const usePackingStore = create<PackingState>((set, get) => ({
     return { error: null }
   },
 }))
-
-let cachedTripId: string | null = null
-async function getActiveTripId(): Promise<string | null> {
-  if (cachedTripId) return cachedTripId
-  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-  cachedTripId = data?.id ?? null
-  return cachedTripId
-}

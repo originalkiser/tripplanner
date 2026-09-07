@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
+import { getCurrentTripId } from '../lib/currentTrip'
 import type {
   ActivityCategory,
   ActivitySource,
@@ -143,7 +144,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
   fetchActivities: async () => {
     const generation = ++fetchGeneration
     set({ loading: true })
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     const { data, error } = await supabase
       .from('activities')
       .select(SELECT)
@@ -162,7 +163,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
   },
 
   createActivity: async (input) => {
-    const tripId = await getActiveTripId()
+    const tripId = await getCurrentTripId()
     if (!tripId) return { error: 'No active trip found.' }
 
     const { data: created, error } = await supabase
@@ -325,11 +326,3 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
     return { error: null }
   },
 }))
-
-let cachedTripId: string | null = null
-async function getActiveTripId(): Promise<string | null> {
-  if (cachedTripId) return cachedTripId
-  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
-  cachedTripId = data?.id ?? null
-  return cachedTripId
-}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTripsStore, type MyTripDetails } from '../../stores/tripsStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
+import { getStoredCurrentTripId, setCurrentTripId } from '../../lib/currentTrip'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { CreateTripModal } from './CreateTripModal'
 import type { Database } from '../../types/database'
@@ -23,6 +24,7 @@ export function MyTripsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [knownUsers, setKnownUsers] = useState<Member[]>([])
+  const [viewingTripId] = useState(() => getStoredCurrentTripId())
 
   useEffect(() => {
     if (profile) void fetchMyTrips(profile.id)
@@ -65,64 +67,74 @@ export function MyTripsPage() {
       )}
 
       <ul className="mt-4 flex flex-col gap-3">
-        {myTrips.map((trip) => (
-          <li key={trip.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
-            <button
-              type="button"
-              onClick={() => toggleExpanded(trip.id)}
-              className="flex w-full items-center justify-between gap-2 p-3 text-left"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-heading font-semibold">{trip.name}</p>
-                  {trip.is_active && (
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent">
-                      Active
-                    </span>
-                  )}
-                  {trip.myRole === 'admin' && (
-                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      admin
-                    </span>
-                  )}
+        {myTrips.map((trip) => {
+          const isViewing = viewingTripId ? trip.id === viewingTripId : trip.is_active
+          return (
+            <li key={trip.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
+              <button
+                type="button"
+                onClick={() => toggleExpanded(trip.id)}
+                className="flex w-full items-center justify-between gap-2 p-3 text-left"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-heading font-semibold">{trip.name}</p>
+                    {trip.is_active && (
+                      <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent">
+                        Active
+                      </span>
+                    )}
+                    {isViewing && (
+                      <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        Viewing
+                      </span>
+                    )}
+                    {trip.myRole === 'admin' && (
+                      <span className="rounded-full bg-bg px-2 py-0.5 text-[10px] font-medium text-text-dim">
+                        admin
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-text-dim">
+                    {trip.location && `${trip.location} · `}
+                    {formatDateRange(trip.start_date, trip.end_date)}
+                  </p>
                 </div>
-                <p className="mt-0.5 text-xs text-text-dim">
-                  {trip.location && `${trip.location} · `}
-                  {formatDateRange(trip.start_date, trip.end_date)}
-                </p>
-              </div>
-              <span className="shrink-0 text-text-dim">{expandedId === trip.id ? '−' : '+'}</span>
-            </button>
+                <span className="shrink-0 text-text-dim">{expandedId === trip.id ? '−' : '+'}</span>
+              </button>
 
-            {expandedId === trip.id && profile && (
-              <TripManagePanel
-                tripId={trip.id}
-                isActive={trip.is_active}
-                isAdmin={trip.myRole === 'admin'}
-                members={members[trip.id] ?? []}
-                knownUsers={knownUsers}
-                myUserId={profile.id}
-                onSetRole={setMemberRole}
-                onUpdateMyDetails={updateMyDetails}
-                onAddMembers={addMembers}
-                activating={activatingId === trip.id}
-                onActivate={async () => {
-                  if (
-                    !confirm(
-                      `Make "${trip.name}" the active trip? Everyone will see its Plans, Packing List, Album, etc. instead of the current trip's.`,
-                    )
-                  ) {
-                    return
-                  }
-                  setActivatingId(trip.id)
-                  await activateTrip(trip.id)
-                  setActivatingId(null)
-                  if (profile) void fetchMyTrips(profile.id)
-                }}
-              />
-            )}
-          </li>
-        ))}
+              {expandedId === trip.id && profile && (
+                <TripManagePanel
+                  tripId={trip.id}
+                  isActive={trip.is_active}
+                  isViewing={isViewing}
+                  isAdmin={trip.myRole === 'admin'}
+                  members={members[trip.id] ?? []}
+                  knownUsers={knownUsers}
+                  myUserId={profile.id}
+                  onSetRole={setMemberRole}
+                  onUpdateMyDetails={updateMyDetails}
+                  onAddMembers={addMembers}
+                  onView={() => setCurrentTripId(trip.is_active ? null : trip.id)}
+                  activating={activatingId === trip.id}
+                  onActivate={async () => {
+                    if (
+                      !confirm(
+                        `Make "${trip.name}" the active trip? Everyone will see its Plans, Packing List, Album, etc. instead of the current trip's.`,
+                      )
+                    ) {
+                      return
+                    }
+                    setActivatingId(trip.id)
+                    await activateTrip(trip.id)
+                    setActivatingId(null)
+                    if (profile) void fetchMyTrips(profile.id)
+                  }}
+                />
+              )}
+            </li>
+          )
+        })}
       </ul>
 
       {showCreate && (
@@ -141,6 +153,7 @@ export function MyTripsPage() {
 function TripManagePanel({
   tripId,
   isActive,
+  isViewing,
   isAdmin,
   members,
   knownUsers,
@@ -148,11 +161,13 @@ function TripManagePanel({
   onSetRole,
   onUpdateMyDetails,
   onAddMembers,
+  onView,
   activating,
   onActivate,
 }: {
   tripId: string
   isActive: boolean
+  isViewing: boolean
   isAdmin: boolean
   members: ReturnType<typeof useTripsStore.getState>['members'][string]
   knownUsers: Member[]
@@ -160,6 +175,7 @@ function TripManagePanel({
   onSetRole: (tripId: string, userId: string, role: 'admin' | 'member') => Promise<{ error: string | null }>
   onUpdateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
   onAddMembers: (tripId: string, userIds: string[]) => Promise<{ error: string | null }>
+  onView: () => void
   activating: boolean
   onActivate: () => void
 }) {
@@ -217,6 +233,18 @@ function TripManagePanel({
 
   return (
     <div className="border-t border-line p-3">
+      {isViewing ? (
+        <p className="mb-3 text-center text-xs text-text-dim">You're viewing this trip right now.</p>
+      ) : (
+        <button
+          type="button"
+          onClick={onView}
+          className="mb-3 w-full rounded-lg border border-primary px-3 py-2 text-xs font-medium text-primary"
+        >
+          {isActive ? 'View this trip' : "View this trip (without making it everyone's active trip)"}
+        </button>
+      )}
+
       {isAdmin && !isActive && (
         <button
           type="button"
