@@ -229,8 +229,10 @@ export function HomePage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-24">
-      <h1 className="text-2xl font-semibold text-primary">Home</h1>
-      <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
+        <h1 className="text-2xl font-semibold text-primary">Home</h1>
+        <p className="mt-1 text-sm text-text-dim">Where the group is staying — anyone can edit this.</p>
+      </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
         <Link

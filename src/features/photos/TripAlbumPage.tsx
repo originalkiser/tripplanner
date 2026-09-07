@@ -486,7 +486,7 @@ export function TripAlbumPage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-32">
-      <div className="flex items-start justify-between gap-2">
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 flex items-start justify-between gap-2 bg-bg px-4 pb-3 pt-4 shadow-sm">
         <div>
           <h1 className="text-2xl font-semibold text-primary">Trip Album</h1>
           <p className="mt-1 text-sm text-text-dim">Every photo and video from the trip, in time order.</p>
