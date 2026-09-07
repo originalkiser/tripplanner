@@ -76,7 +76,7 @@ const FRONT_SNOW_CAPS = snowCaps(FRONT_RIDGE, 9)
 
 export function MountainScene() {
   return (
-    <div className="scene-fixed">
+    <div className="scene-inflow">
       <div className="scene-bg scene-day">
         <div className="scene-sky-mountain-day" />
         <div className="scene-ground-mountain-day" />

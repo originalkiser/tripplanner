@@ -6,6 +6,7 @@ import { PRESET_AVATARS } from './presetAvatars'
 import { getStoredTheme, setTheme, type ThemePreference } from '../../lib/theme'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { compressImage } from '../../lib/imageCompression'
+import { PageHeader } from '../../components/layout/PageHeader'
 
 export function ProfilePage() {
   const profile = useAuthStore((s) => s.profile)
@@ -117,9 +118,21 @@ export function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-md p-4 pb-8">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <h1 className="text-2xl font-semibold text-primary">Profile</h1>
-      </div>
+      <PageHeader title="Profile" />
+
+      <Link
+        to="/trips"
+        className="card-shadow mt-4 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
+      >
+        My trips &rarr;
+      </Link>
+
+      <Link
+        to="/people"
+        className="card-shadow mt-3 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
+      >
+        Trip members &rarr;
+      </Link>
 
       <section className="card-shadow mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Appearance</h2>
@@ -237,20 +250,6 @@ export function ProfilePage() {
           {passwordStatus && <p className="text-sm">{passwordStatus}</p>}
         </form>
       </section>
-
-      <Link
-        to="/people"
-        className="card-shadow mt-4 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
-      >
-        Trip members &rarr;
-      </Link>
-
-      <Link
-        to="/trips"
-        className="card-shadow mt-3 block rounded-xl border border-line bg-surface p-4 text-sm font-medium text-primary"
-      >
-        My trips &rarr;
-      </Link>
 
       <button
         type="button"

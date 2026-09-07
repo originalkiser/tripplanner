@@ -19,6 +19,8 @@
   --color-savannah: #2d5d7b;
   --color-tybee: #1b7a8c;
   --color-coral: #d97a6c;
+  --color-success: #86efac;
+  --color-success-tint: #f0fdf4;
 }
 
 :root {
@@ -39,6 +41,8 @@
     --color-savannah: #7fb3d5;
     --color-tybee: #4fc3d9;
     --color-coral: #e2897c;
+    --color-success: #4ade80;
+    --color-success-tint: #14532d;
     --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.35);
   }
 }
@@ -56,6 +60,8 @@
   --color-savannah: #7fb3d5;
   --color-tybee: #4fc3d9;
   --color-coral: #e2897c;
+  --color-success: #4ade80;
+  --color-success-tint: #14532d;
   --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.35);
 }
 
@@ -83,8 +89,15 @@ h4 {
 }
 
 /* Beach scene backdrop: sky, horizon, water, swaying palm trees, drifting
-   clouds, a twinkling night sky, and a glowing sun or moon. Fixed to the top
-   of the viewport (see .scene-fixed) so it never scrolls away. */
+   clouds, a twinkling night sky, and a glowing sun or moon. Sits in normal
+   document flow at the top of each page's scrollable content (see
+   .scene-inflow) so it scrolls away like any other content instead of
+   staying pinned — once it scrolls past, each page's own sticky header
+   (now showing the current trip's name too, see PageHeader) takes over at
+   the top of the screen. --scene-h still doubles as the safe clearance the
+   few genuinely-fixed floating elements (NotificationStack, banners) keep
+   below the top of the viewport, tuned to roughly clear a collapsed sticky
+   header regardless of which page you're on. */
 :root {
   --scene-h: 96px;
 }
@@ -93,34 +106,17 @@ h4 {
    wider desktop layout at (see .scene-content-desktop below), so the extra
    height and the extra width show up together. Mobile no longer gets a
    shorter strip than tablet: an earlier smaller mobile tier made the scene
-   (and everything scaled to fit it) look "very very small" on phones.
-   Everything that reads var(--scene-h) (main's top padding, the sticky
-   header offset, the notification stack position) picks this up
-   automatically. */
+   (and everything scaled to fit it) look "very very small" on phones. */
 @media (min-width: 1024px) {
   :root {
     --scene-h: 128px;
   }
 }
 
-.scene-fixed {
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
+.scene-inflow {
+  position: relative;
   height: var(--scene-h);
-  /* Higher than <main>'s z-10 (see AppShell) — <main> is a scrolling
-     sibling, not an ancestor, so once its content scrolls up into this
-     strip it needs to lose the paint order fight, or the scene gets
-     painted *under* scrolled-past cards instead of masking them. */
-  z-index: 15;
-  pointer-events: none;
   overflow: hidden;
-  /* Forces this onto its own compositor layer. Without it, some mobile
-     browsers can let a fast-scrolling sibling repaint a frame ahead of a
-     fixed element, showing scrolled content flash through the strip for
-     an instant before the fixed layer catches up. */
-  transform: translateZ(0);
-  will-change: transform;
 }
 
 /* Full-bleed gradient wash — always fills the container exactly, since

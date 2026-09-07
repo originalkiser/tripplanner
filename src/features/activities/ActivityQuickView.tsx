@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useActivitiesStore } from '../../stores/activitiesStore'
 import { ActivityCard } from './ActivityCard'
 
@@ -16,13 +17,13 @@ export function ActivityQuickView({ activityId, onClose }: { activityId: string;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId])
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center"
       onClick={onClose}
     >
       <div
-        className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-bg"
+        className="flex max-h-[calc(100svh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-bg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 justify-end p-2">
@@ -38,6 +39,7 @@ export function ActivityQuickView({ activityId, onClose }: { activityId: string;
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

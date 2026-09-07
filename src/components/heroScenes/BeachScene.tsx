@@ -56,7 +56,7 @@
 // history.
 export function BeachScene() {
   return (
-    <div className="scene-fixed">
+    <div className="scene-inflow">
       <div className="scene-bg scene-day">
         <div className="scene-sky-day" />
         <div className="scene-water-day" />

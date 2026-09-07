@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { useActivitiesStore, type Activity, type ActivityFields } from '../../stores/activitiesStore'
 import { categoryFromLatLng, searchLocations, type LocationResult } from '../../lib/geo'
@@ -76,10 +77,17 @@ export function CreateActivityModal({
   const inviteParticipants = useActivitiesStore((s) => s.inviteParticipants)
   const tagParticipants = useActivitiesStore((s) => s.tagParticipants)
   const isEdit = !!activity
+  // Future plan vs. already happened/happening now — a toggle at the top of
+  // the form rather than two separate modals, since the rest of the form is
+  // otherwise identical. Fixed once an activity exists (editing never
+  // reclassifies which one it was); for a new one it starts from whichever
+  // entry point opened this modal (the "Log a Visit" shortcut vs. the
+  // regular "+" button) but can be switched either way before saving.
+  const [loggedMode, setLoggedMode] = useState(activity ? activity.source === 'logged' : !!logMode)
   // A logged visit already happened, so "invite" (a pending ask someone
   // still has to accept) doesn't fit — people picked here are tagged as
   // having been there, joined outright with no response needed.
-  const isLogged = logMode || activity?.source === 'logged'
+  const isLogged = loggedMode
 
   const [members, setMembers] = useState<Member[]>([])
   const [inviteIds, setInviteIds] = useState<Set<string>>(new Set())
@@ -106,7 +114,7 @@ export function CreateActivityModal({
 
   const [type, setType] = useState<ActivityType>(activity?.type ?? 'activity')
   const [name, setName] = useState(activity?.name ?? '')
-  const [date, setDate] = useState(activity?.proposed_date ?? (logMode ? todayIso() : ''))
+  const [date, setDate] = useState(activity?.proposed_date ?? (loggedMode ? todayIso() : ''))
   const [time, setTime] = useState(activity?.proposed_time?.slice(0, 5) ?? '')
   const [duration, setDuration] = useState(
     activity?.duration_minutes != null ? String(activity.duration_minutes) : '',
@@ -138,6 +146,13 @@ export function CreateActivityModal({
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Switching to "Already happened" defaults the date to today (the common
+  // case — logging something that just happened) without overwriting a date
+  // someone already picked before flipping the toggle.
+  useEffect(() => {
+    if (loggedMode && !date) setDate(todayIso())
+  }, [loggedMode, date])
 
   function onLocationInput(value: string) {
     setLocationQuery(value)
@@ -224,7 +239,7 @@ export function CreateActivityModal({
 
     const { error, activityId } = await createActivity({
       ...fields,
-      source: logMode ? 'logged' : 'user_added',
+      source: loggedMode ? 'logged' : 'user_added',
       createdBy: profile.id,
       initialRating: rating,
     })
@@ -266,7 +281,7 @@ export function CreateActivityModal({
     onClose()
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
       {/* The card itself — not the form — is the scrolling region, with the
           header and save button sticky within it, so touch-scroll can
@@ -279,11 +294,15 @@ export function CreateActivityModal({
           layout when that state changes mid-interaction — previously
           leaving the card taller than the actually-visible screen, clipped
           at both ends with no correct height to scroll within. svh never
-          changes, so the cap is always honored. */}
+          changes, so the cap is always honored. Portaled to document.body
+          (see photo lightboxes for the same fix) since a plain z-50 here
+          only wins within <main>'s own stacking context — it can't paint
+          above the fixed hero scene or bottom nav sitting outside it as
+          siblings, which otherwise clipped the top and bottom of the card. */}
       <div className="flex max-h-[calc(100svh-2rem)] w-full max-w-md flex-col overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-surface">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface p-4">
           <h2 className="text-xl font-semibold text-primary">
-            {isEdit ? 'Edit Activity' : logMode ? 'Log a Visit' : 'New Activity'}
+            {isEdit ? 'Edit Activity' : loggedMode ? 'Log a Visit' : 'New Activity'}
           </h2>
           <button type="button" onClick={onClose} className="text-2xl leading-none opacity-60">
             &times;
@@ -291,6 +310,29 @@ export function CreateActivityModal({
         </div>
 
         <form id="activity-form" onSubmit={submit} className="flex flex-col gap-4 p-4">
+          {!isEdit && (
+            <div className="flex gap-2 rounded-full bg-bg p-1">
+              <button
+                type="button"
+                onClick={() => setLoggedMode(false)}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium ${
+                  !loggedMode ? 'bg-primary text-white' : 'text-text-dim'
+                }`}
+              >
+                Future plan
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoggedMode(true)}
+                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-medium ${
+                  loggedMode ? 'bg-primary text-white' : 'text-text-dim'
+                }`}
+              >
+                Already happened
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             {TYPE_OPTIONS.map((opt) => (
               <button
@@ -333,7 +375,7 @@ export function CreateActivityModal({
           </div>
           {linkStatus && <p className="-mt-2 text-xs text-text-dim">{linkStatus}</p>}
 
-          {!logMode && (
+          {!loggedMode && (
             <div className="flex items-center gap-2">
               <input
                 id="unscheduled"
@@ -378,7 +420,7 @@ export function CreateActivityModal({
             </div>
           )}
 
-          {!isEdit && !logMode && (
+          {!isEdit && !loggedMode && (
             <div className="rounded-lg bg-secondary/10 p-3">
               <div className="flex items-center gap-2">
                 <input
@@ -493,14 +535,14 @@ export function CreateActivityModal({
 
           {!isEdit && (
             <div>
-              <p className="mb-1 text-sm font-medium">{logMode ? 'How was it?' : 'How excited are you?'}</p>
+              <p className="mb-1 text-sm font-medium">{loggedMode ? 'How was it?' : 'How excited are you?'}</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((n) => (
                   <button
                     key={n}
                     type="button"
                     onClick={() => setRating(n)}
-                    title={logMode ? LOGGED_RATING_LABELS[n] : RATING_LABELS[n]}
+                    title={loggedMode ? LOGGED_RATING_LABELS[n] : RATING_LABELS[n]}
                     className={`flex-1 rounded-lg py-2 text-sm font-medium ${
                       rating === n ? 'bg-accent text-white' : 'bg-bg text-text'
                     }`}
@@ -511,7 +553,7 @@ export function CreateActivityModal({
               </div>
               {rating && (
                 <p className="mt-1 text-xs text-text-dim">
-                  {logMode ? LOGGED_RATING_LABELS[rating] : RATING_LABELS[rating]}
+                  {loggedMode ? LOGGED_RATING_LABELS[rating] : RATING_LABELS[rating]}
                 </p>
               )}
             </div>
@@ -531,10 +573,11 @@ export function CreateActivityModal({
             disabled={saving}
             className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-white disabled:opacity-50"
           >
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : logMode ? 'Log Visit' : 'Add Activity'}
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : loggedMode ? 'Log Visit' : 'Add Activity'}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

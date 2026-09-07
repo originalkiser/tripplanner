@@ -1,14 +1,20 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { useTripsStore } from '../../stores/tripsStore'
+import { getCurrentTripId } from '../../lib/currentTrip'
 import { resolveAssetUrl } from '../../lib/assetUrl'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { Database } from '../../types/database'
 
-type Member = Database['trip']['Tables']['user_profiles']['Row']
+type Profile = Database['trip']['Tables']['user_profiles']['Row']
+type Member = Profile & { tripRole: 'admin' | 'member' }
 
 export function PeoplePage() {
   const isAdmin = useAuthStore((s) => s.profile?.is_admin ?? false)
+  const addMembers = useTripsStore((s) => s.addMembers)
+  const [tripId, setTripId] = useState<string | null>(null)
+  const [tripName, setTripName] = useState<string | null>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [loadingMembers, setLoadingMembers] = useState(true)
 
@@ -19,40 +25,62 @@ export function PeoplePage() {
 
   const [resettingId, setResettingId] = useState<string | null>(null)
 
-  async function loadMembers() {
+  async function loadMembers(forTripId: string) {
     setLoadingMembers(true)
     const { data } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .order('display_name')
-    setMembers(data ?? [])
+      .from('trip_members')
+      .select('role, profile:user_profiles!user_id(*)')
+      .eq('trip_id', forTripId)
+    const rows = ((data ?? []) as unknown as { role: 'admin' | 'member'; profile: Profile | null }[])
+      .filter((row) => row.profile)
+      .map((row) => ({ ...row.profile!, tripRole: row.role }))
+      .sort((a, b) => a.display_name.localeCompare(b.display_name))
+    setMembers(rows)
     setLoadingMembers(false)
   }
 
   useEffect(() => {
-    void loadMembers()
+    void (async () => {
+      const currentTripId = await getCurrentTripId()
+      setTripId(currentTripId)
+      if (!currentTripId) {
+        setLoadingMembers(false)
+        return
+      }
+      const { data: trip } = await supabase.from('trips').select('name').eq('id', currentTripId).maybeSingle()
+      setTripName(trip?.name ?? null)
+      await loadMembers(currentTripId)
+    })()
   }, [])
 
   async function invite(e: React.FormEvent) {
     e.preventDefault()
+    if (!tripId) return
     setInviting(true)
     setInviteStatus(null)
 
     const { data: sessionData } = await supabase.auth.getSession()
-    const { error } = await supabase.functions.invoke('invite-user', {
+    const { data, error } = await supabase.functions.invoke<{ ok: boolean; userId: string }>('invite-user', {
       body: { email: email.trim(), displayName: displayName.trim() || undefined },
       headers: { Authorization: `Bearer ${sessionData.session?.access_token}` },
     })
 
-    setInviting(false)
-    if (error) {
-      setInviteStatus(`Error: ${error.message}`)
+    if (error || !data) {
+      setInviting(false)
+      setInviteStatus(`Error: ${error?.message ?? 'Invite failed'}`)
       return
     }
-    setInviteStatus(`Added ${email}. They can sign in with that email and any password.`)
+
+    const { error: memberError } = await addMembers(tripId, [data.userId])
+    setInviting(false)
+    if (memberError) {
+      setInviteStatus(`Error: ${memberError}`)
+      return
+    }
+    setInviteStatus(`Added ${email} to the trip. They can sign in with that email and any password.`)
     setEmail('')
     setDisplayName('')
-    void loadMembers()
+    void loadMembers(tripId)
   }
 
   async function resetPassword(member: Member) {
@@ -70,17 +98,12 @@ export function PeoplePage() {
       alert(`Error: ${error.message}`)
       return
     }
-    void loadMembers()
+    if (tripId) void loadMembers(tripId)
   }
 
   return (
     <div className="mx-auto max-w-md p-4 pb-8">
-      <div className="sticky top-0 z-20 -mx-4 -mt-4 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <Link to="/profile" className="text-sm text-primary underline">
-          &larr; Profile
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-primary">Trip Members</h1>
-      </div>
+      <PageHeader title="Trip Members" backTo="/profile" backLabel="Profile" />
 
       <section className="card-shadow mb-6 mt-4 rounded-xl border border-line bg-surface p-4">
         <h2 className="mb-3 text-lg font-medium">Add someone</h2>
@@ -101,7 +124,7 @@ export function PeoplePage() {
           />
           <button
             type="submit"
-            disabled={inviting}
+            disabled={inviting || !tripId}
             className="rounded-xl bg-primary px-4 py-2 font-medium text-white disabled:opacity-50"
           >
             {inviting ? 'Adding…' : 'Add to trip'}
@@ -111,7 +134,7 @@ export function PeoplePage() {
       </section>
 
       <section className="card-shadow rounded-xl border border-line bg-surface p-4">
-        <h2 className="mb-3 text-lg font-medium">Everyone on the trip</h2>
+        <h2 className="mb-3 text-lg font-medium">Everyone on the trip{tripName ? ` – ${tripName}` : ''}</h2>
         {loadingMembers && <p className="text-sm opacity-70">Loading…</p>}
         <ul className="flex flex-col gap-3">
           {members.map((member) => (
@@ -128,7 +151,7 @@ export function PeoplePage() {
               <div className="flex-1">
                 <p className="font-medium">
                   {member.display_name}
-                  {member.is_admin && (
+                  {member.tripRole === 'admin' && (
                     <span className="ml-2 rounded-full bg-accent/20 px-2 py-0.5 text-xs text-accent">
                       admin
                     </span>

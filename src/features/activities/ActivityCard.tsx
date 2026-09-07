@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import type { Activity } from '../../stores/activitiesStore'
 import { useActivitiesStore } from '../../stores/activitiesStore'
@@ -594,15 +595,16 @@ export function ActivityCard({
         </Suspense>
       )}
 
-      {confirmProposal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setConfirmProposal(null)}
-        >
+      {confirmProposal &&
+        createPortal(
           <div
-            className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setConfirmProposal(null)}
           >
+            <div
+              className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
             <div className="mb-1 flex items-start justify-between gap-2">
               <h3 className="font-heading text-lg font-semibold">Use Proposed Date and Time?</h3>
               <button
@@ -641,8 +643,9 @@ export function ActivityCard({
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </div>
   )
 }

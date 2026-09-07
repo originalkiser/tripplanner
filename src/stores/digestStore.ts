@@ -11,6 +11,10 @@ export interface ChangeEntry {
   user_id: string
   activity: { id: string; name: string; proposed_date: string | null } | null
   user: { display_name: string } | null
+  // Only meaningfully populated for fetchDay's cross-trip mode — every
+  // other query is already scoped to a single trip via RLS + the trip_id
+  // filter, so there's nothing to disambiguate.
+  trip: { id: string; name: string } | null
 }
 
 const SELECT = `
@@ -19,13 +23,14 @@ const SELECT = `
   user:user_profiles(display_name)
 `
 
-// Forces an inner join on activities so the trip_id filter below actually
-// restricts the top-level rows (a plain embedded/left-joined relation
-// wouldn't).
+// trip_id is a direct column now (see migration digest_photo_uploads_and_likes)
+// rather than something only reachable by joining through activities, so a
+// general trip-album photo upload/like (no activity_id) still carries one.
 const SELECT_WITH_TRIP = `
-  id, change_type, summary_text, created_at, user_id,
-  activity:activities!inner(id, name, proposed_date, trip_id),
-  user:user_profiles(display_name)
+  id, change_type, summary_text, created_at, user_id, trip_id,
+  activity:activities(id, name, proposed_date),
+  user:user_profiles(display_name),
+  trip:trips(id, name)
 `
 
 interface DigestState {
@@ -35,7 +40,10 @@ interface DigestState {
   loadingDay: boolean
   byActivity: Record<string, ChangeEntry[]>
   fetchSinceLastVisit: (sinceIso: string | null) => Promise<void>
-  fetchDay: (date: string) => Promise<void>
+  // tripId null = across every trip the user belongs to (RLS alone scopes
+  // it to those) rather than one specific trip — the daily digest's
+  // "All trips" filter option.
+  fetchDay: (date: string, tripId: string | null) => Promise<void>
   fetchForActivity: (activityId: string) => Promise<void>
 }
 
@@ -56,7 +64,7 @@ export const useDigestStore = create<DigestState>((set) => ({
     const { data, error } = await supabase
       .from('activity_changes')
       .select(SELECT_WITH_TRIP)
-      .eq('activity.trip_id', tripId ?? '')
+      .eq('trip_id', tripId ?? '')
       .gt('created_at', sinceIso)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -69,18 +77,19 @@ export const useDigestStore = create<DigestState>((set) => ({
     set({ sinceLastVisit: (data ?? []) as unknown as ChangeEntry[], loadingSinceLastVisit: false })
   },
 
-  fetchDay: async (date) => {
+  fetchDay: async (date, tripId) => {
     set({ loadingDay: true })
-    const tripId = await getCurrentTripId()
     const start = `${date}T00:00:00.000Z`
     const end = `${date}T23:59:59.999Z`
-    const { data, error } = await supabase
+    let query = supabase
       .from('activity_changes')
       .select(SELECT_WITH_TRIP)
-      .eq('activity.trip_id', tripId ?? '')
       .gte('created_at', start)
       .lte('created_at', end)
       .order('created_at', { ascending: false })
+    if (tripId) query = query.eq('trip_id', tripId)
+
+    const { data, error } = await query
 
     if (error) {
       console.error(error)

@@ -97,7 +97,7 @@ function NightWindows({ b, index }: { b: Building; index: number }) {
 
 export function CityScene() {
   return (
-    <div className="scene-fixed">
+    <div className="scene-inflow">
       <div className="scene-bg scene-day">
         <div className="scene-sky-city-day" />
         <div className="scene-ground-city-day" />

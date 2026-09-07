@@ -15,6 +15,7 @@ const HISTORY_LABEL: Record<ChangeType, string> = {
   invited: 'requested someone join',
   proposed_time: 'proposed a new time',
   photo_added: 'added a photo',
+  photo_liked: 'liked a photo',
   comment: 'commented',
 }
 

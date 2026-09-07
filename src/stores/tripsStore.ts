@@ -6,8 +6,8 @@ export interface TripMember {
   trip_id: string
   user_id: string
   role: 'admin' | 'member'
-  arrival_date: string | null
-  departure_date: string | null
+  arrival_at: string | null
+  departure_at: string | null
   adults_count: number
   children_count: number
   allergies: string | null
@@ -21,6 +21,7 @@ export interface MyTrip {
   location: string | null
   start_date: string
   end_date: string
+  hero_theme: HeroTheme
   created_by: string | null
   created_at: string
   myRole: 'admin' | 'member'
@@ -35,15 +36,15 @@ export interface StayInput {
 }
 
 export interface MyTripDetails {
-  arrivalDate: string | null
-  departureDate: string | null
+  arrivalAt: string | null
+  departureAt: string | null
   adultsCount: number
   childrenCount: number
   allergies: string | null
 }
 
 const MEMBER_SELECT = `
-  trip_id, user_id, role, arrival_date, departure_date, adults_count, children_count, allergies, joined_at,
+  trip_id, user_id, role, arrival_at, departure_at, adults_count, children_count, allergies, joined_at,
   profile:user_profiles!user_id(display_name, avatar_url)
 `
 
@@ -63,6 +64,17 @@ interface TripsState {
     inviteUserIds: string[]
     heroTheme: HeroTheme
   }) => Promise<{ error: string | null; tripId?: string }>
+  updateTrip: (
+    tripId: string,
+    input: {
+      name: string
+      location: string | null
+      startDate: string
+      endDate: string
+      stay: StayInput
+      heroTheme: HeroTheme
+    },
+  ) => Promise<{ error: string | null }>
   setMemberRole: (tripId: string, userId: string, role: 'admin' | 'member') => Promise<{ error: string | null }>
   updateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
   addMembers: (tripId: string, userIds: string[]) => Promise<{ error: string | null }>
@@ -77,7 +89,7 @@ export const useTripsStore = create<TripsState>((set, get) => ({
     set({ loading: true })
     const { data, error } = await supabase
       .from('trip_members')
-      .select('role, trip:trips(id, name, location, start_date, end_date, created_by, created_at)')
+      .select('role, trip:trips(id, name, location, start_date, end_date, hero_theme, created_by, created_at)')
       .eq('user_id', userId)
     if (error) {
       console.error(error)
@@ -137,6 +149,38 @@ export const useTripsStore = create<TripsState>((set, get) => ({
     return { error: null, tripId: trip.id }
   },
 
+  updateTrip: async (tripId, input) => {
+    const { error } = await supabase
+      .from('trips')
+      .update({
+        name: input.name,
+        location: input.location,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        hero_theme: input.heroTheme,
+      })
+      .eq('id', tripId)
+    if (error) return { error: error.message }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const { error: stayError } = await supabase.from('stays').upsert({
+      trip_id: tripId,
+      name: input.stay.name,
+      address: input.stay.address,
+      stay_type: input.stay.stayType,
+      check_in_at: input.stay.checkInAt,
+      check_out_at: input.stay.checkOutAt,
+      updated_by: user?.id ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    if (stayError) return { error: stayError.message }
+
+    return { error: null }
+  },
+
   setMemberRole: async (tripId, userId, role) => {
     const { error } = await supabase
       .from('trip_members')
@@ -152,8 +196,8 @@ export const useTripsStore = create<TripsState>((set, get) => ({
     const { error } = await supabase
       .from('trip_members')
       .update({
-        arrival_date: fields.arrivalDate,
-        departure_date: fields.departureDate,
+        arrival_at: fields.arrivalAt,
+        departure_at: fields.departureAt,
         adults_count: fields.adultsCount,
         children_count: fields.childrenCount,
         allergies: fields.allergies,

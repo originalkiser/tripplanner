@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { usePackingStore } from '../../stores/packingStore'
 import { supabase } from '../../lib/supabase'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { PackingItemCard } from './PackingItemCard'
+import { PageHeader } from '../../components/layout/PageHeader'
 import type { Database } from '../../types/database'
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
@@ -124,12 +126,11 @@ export function PackingListPage() {
 
   return (
     <div className={`mx-auto max-w-6xl pb-24 ${mode === 'private' ? 'bg-coral/5' : ''}`}>
-      <div className="sticky top-0 z-20 bg-bg px-4 pb-3 pt-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className={`text-2xl font-semibold ${mode === 'private' ? 'text-coral' : 'text-primary'}`}>
-            Packing List
-          </h1>
-        </div>
+      <PageHeader
+        title="Packing List"
+        titleClassName={`text-2xl font-semibold ${mode === 'private' ? 'text-coral' : 'text-primary'}`}
+        bleed={false}
+      >
         <div className="mt-3 flex rounded-full bg-surface-2 p-0.5 text-sm font-medium">
           <button
             type="button"
@@ -146,7 +147,7 @@ export function PackingListPage() {
             Private
           </button>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="p-4">
         {mode === 'private' && (
@@ -390,37 +391,39 @@ export function PackingListPage() {
         )}
       </div>
 
-      {confirmInvite && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setConfirmInvite(null)}
-        >
-          <div className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-2 font-heading text-lg font-semibold">Add to this list?</h3>
-            <p className="mb-4 text-sm text-text-dim">
-              {confirmInvite.map((m) => m.display_name).join(', ')} will be able to see and edit this
-              private list.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleConfirmInvite()}
-                className="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                Yes, add them
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmInvite(null)}
-                className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
-              >
-                Cancel
-              </button>
+      {confirmInvite &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setConfirmInvite(null)}
+          >
+            <div className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-2 font-heading text-lg font-semibold">Add to this list?</h3>
+              <p className="mb-4 text-sm text-text-dim">
+                {confirmInvite.map((m) => m.display_name).join(', ')} will be able to see and edit this
+                private list.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleConfirmInvite()}
+                  className="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Yes, add them
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmInvite(null)}
+                  className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
