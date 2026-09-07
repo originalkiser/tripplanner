@@ -180,11 +180,11 @@ h4 {
   border-top: 1.5px solid rgba(255, 255, 255, 0.5);
 }
 .scene-sky-mountain-night {
-  background: linear-gradient(to bottom, #0d1b2e, #1b3350);
+  background: linear-gradient(to bottom, #201335, #3a2456);
 }
 .scene-ground-mountain-night {
-  background: linear-gradient(to bottom, #1c2b22, #0f1a14);
-  border-top: 1.5px solid rgba(72, 96, 88, 0.6);
+  background: linear-gradient(to bottom, #201b2c, #120f1a);
+  border-top: 1.5px solid rgba(100, 84, 120, 0.6);
 }
 
 .scene-sky-city-day {

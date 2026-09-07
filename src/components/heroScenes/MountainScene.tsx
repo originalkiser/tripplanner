@@ -8,6 +8,72 @@
 // theme with no tuning history yet, not worth it for beach's proven scene.
 // Horizon sits at y=50 of a 72-tall viewBox (69.44%), matching the
 // .scene-sky/.scene-ground flex split in index.css exactly.
+type Pt = [number, number]
+
+// Both ranges are plain ridgelines (left edge → alternating peak/valley →
+// right edge → down to the horizon → back to the start). Snow caps are
+// derived from this same data (see snowCaps below) instead of being
+// separately hand-placed triangles, so they're geometrically guaranteed to
+// sit exactly on the ridge's own slope instead of just approximating it.
+const BACK_RIDGE: Pt[] = [
+  [-10, 42],
+  [30, 20],
+  [70, 34],
+  [120, 12],
+  [170, 32],
+  [220, 17],
+  [270, 36],
+  [320, 22],
+  [400, 40],
+  [400, 50],
+  [-10, 50],
+]
+
+const FRONT_RIDGE: Pt[] = [
+  [-10, 50],
+  [25, 26],
+  [65, 44],
+  [105, 16],
+  [145, 40],
+  [195, 21],
+  [245, 46],
+  [295, 29],
+  [345, 47],
+  [400, 34],
+  [400, 50],
+  [-10, 50],
+]
+
+function ridgePath(points: Pt[]): string {
+  return points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ') + ' Z'
+}
+
+// A peak is any interior ridge point lower (smaller y) than both its
+// neighbors. The cap triangle's two base corners are linear-interpolated
+// along the peak's own two edges by a fixed vertical drop, so they land
+// exactly on the ridge line rather than at independently-guessed
+// coordinates that can drift off the slope.
+function snowCaps(points: Pt[], drop: number): string[] {
+  const caps: string[] = []
+  for (let i = 1; i <= points.length - 3; i++) {
+    const [px, py] = points[i]
+    const [lx, ly] = points[i - 1]
+    const [rx, ry] = points[i + 1]
+    if (py < ly && py < ry) {
+      const tL = Math.min(drop / (ly - py), 1)
+      const tR = Math.min(drop / (ry - py), 1)
+      const lx2 = px + (lx - px) * tL
+      const ly2 = py + (ly - py) * tL
+      const rx2 = px + (rx - px) * tR
+      const ry2 = py + (ry - py) * tR
+      caps.push(`M${px},${py} L${rx2},${ry2} L${lx2},${ly2} Z`)
+    }
+  }
+  return caps
+}
+
+const FRONT_SNOW_CAPS = snowCaps(FRONT_RIDGE, 9)
+
 export function MountainScene() {
   return (
     <div className="scene-fixed">
@@ -34,28 +100,18 @@ export function MountainScene() {
             <ellipse cx="98" cy="11" rx="8" ry="4" />
           </g>
 
-          {/* Back range — hazy, distant */}
-          <path
-            d="M-10,42 L30,20 L70,34 L120,12 L170,32 L220,17 L270,36 L320,22 L400,40 L400,50 L-10,50 Z"
-            fill="#b9cfd6"
-            opacity="0.75"
-          />
-
-          {/* Front range — closer, darker, with snow caps */}
-          <path
-            d="M-10,50 L25,26 L65,44 L105,16 L145,40 L195,21 L245,46 L295,29 L345,47 L400,34 L400,50 L-10,50 Z"
-            fill="#6f8f6a"
-          />
-          <path d="M105,16 L114,26 L96,26 Z" fill="#f4f8f7" />
-          <path d="M195,21 L204,30 L186,30 Z" fill="#f4f8f7" />
-          <path d="M25,26 L32,34 L18,34 Z" fill="#f4f8f7" />
+          <path d={ridgePath(BACK_RIDGE)} fill="#b9cfd6" opacity="0.75" />
+          <path d={ridgePath(FRONT_RIDGE)} fill="#6f8f6a" />
+          {FRONT_SNOW_CAPS.map((d, i) => (
+            <path key={i} d={d} fill="#f4f8f7" />
+          ))}
 
           <Pine x={355} baseY={50} height={16} />
           <Pine x={372} baseY={50} height={12} />
         </g>
 
         <g className="scene-visibility scene-night">
-          <g fill="#eaf2f3">
+          <g fill="#e9ddfb">
             {STAR_POSITIONS.map(([sx, sy, r], i) => (
               <circle
                 key={i}
@@ -68,21 +124,14 @@ export function MountainScene() {
             ))}
           </g>
 
-          <circle className="scene-sun" cx="345" cy="13" r="6" fill="#eaf2f3" />
-          <circle cx="343" cy="11" r="6" fill="#0d1b2e" opacity="0.55" />
+          <circle className="scene-sun" cx="345" cy="13" r="6" fill="#e9ddfb" />
+          <circle cx="343" cy="11" r="6" fill="#241735" opacity="0.55" />
 
-          <path
-            d="M-10,42 L30,20 L70,34 L120,12 L170,32 L220,17 L270,36 L320,22 L400,40 L400,50 L-10,50 Z"
-            fill="#243b4a"
-            opacity="0.8"
-          />
-          <path
-            d="M-10,50 L25,26 L65,44 L105,16 L145,40 L195,21 L245,46 L295,29 L345,47 L400,34 L400,50 L-10,50 Z"
-            fill="#16232a"
-          />
-          <path d="M105,16 L114,26 L96,26 Z" fill="#3a4d55" />
-          <path d="M195,21 L204,30 L186,30 Z" fill="#3a4d55" />
-          <path d="M25,26 L32,34 L18,34 Z" fill="#3a4d55" />
+          <path d={ridgePath(BACK_RIDGE)} fill="#4a3a63" opacity="0.75" />
+          <path d={ridgePath(FRONT_RIDGE)} fill="#241d33" />
+          {FRONT_SNOW_CAPS.map((d, i) => (
+            <path key={i} d={d} fill="#8f7fb8" />
+          ))}
 
           <Pine x={355} baseY={50} height={16} dark />
           <Pine x={372} baseY={50} height={12} dark />
@@ -109,8 +158,8 @@ const STAR_POSITIONS: Array<[number, number, number]> = [
 // (no per-branch detail like the palm's fronds) since it only ever appears
 // small, in the front corner of the scene.
 function Pine({ x, baseY, height, dark }: { x: number; baseY: number; height: number; dark?: boolean }) {
-  const trunk = dark ? '#1a1410' : '#4a3423'
-  const fill = dark ? '#16302a' : '#3a6b4f'
+  const trunk = dark ? '#1a1420' : '#4a3423'
+  const fill = dark ? '#2f2645' : '#3a6b4f'
   return (
     <g transform={`translate(${x},${baseY})`}>
       <rect x={-1} y={-height * 0.25} width={2} height={height * 0.25} fill={trunk} />

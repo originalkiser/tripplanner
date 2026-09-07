@@ -4,47 +4,92 @@ interface Building {
   x: number
   width: number
   height: number
-  // Which window cells (row, col from the top-left of this building) are
-  // lit at night — hand-picked per building rather than randomized so the
-  // pattern is stable across renders instead of flickering into different
-  // windows on every re-render.
-  litWindows: Array<[number, number]>
 }
 
 // Roughly back-to-front by height (taller ones read as further back), left
 // to right. Coordinates in the 400x72 viewBox, sitting on the y=50 horizon.
 const BUILDINGS: Building[] = [
-  { x: 10, width: 28, height: 22, litWindows: [[0, 0], [1, 1], [2, 0]] },
-  { x: 42, width: 20, height: 32, litWindows: [[0, 0], [0, 1], [2, 1], [3, 0]] },
-  { x: 66, width: 24, height: 16, litWindows: [[1, 0]] },
-  { x: 96, width: 22, height: 38, litWindows: [[0, 1], [1, 0], [3, 1], [4, 0]] },
-  { x: 124, width: 18, height: 24, litWindows: [[2, 0]] },
-  { x: 150, width: 26, height: 30, litWindows: [[0, 0], [1, 1], [2, 0], [3, 1]] },
-  { x: 182, width: 20, height: 20, litWindows: [[1, 1]] },
-  { x: 210, width: 24, height: 40, litWindows: [[0, 0], [2, 1], [3, 0], [5, 1]] },
-  { x: 240, width: 20, height: 26, litWindows: [[1, 0], [3, 1]] },
-  { x: 266, width: 28, height: 18, litWindows: [[0, 1]] },
-  { x: 300, width: 22, height: 34, litWindows: [[0, 0], [1, 1], [3, 0], [4, 1]] },
-  { x: 328, width: 20, height: 22, litWindows: [[2, 0]] },
-  { x: 354, width: 26, height: 28, litWindows: [[0, 1], [1, 0], [2, 1]] },
+  { x: 10, width: 28, height: 22 },
+  { x: 42, width: 20, height: 32 },
+  { x: 66, width: 24, height: 16 },
+  { x: 96, width: 22, height: 38 },
+  { x: 124, width: 18, height: 24 },
+  { x: 150, width: 26, height: 30 },
+  { x: 182, width: 20, height: 20 },
+  { x: 210, width: 24, height: 40 },
+  { x: 240, width: 20, height: 26 },
+  { x: 266, width: 28, height: 18 },
+  { x: 300, width: 22, height: 34 },
+  { x: 328, width: 20, height: 22 },
+  { x: 354, width: 26, height: 28 },
 ]
 
-const WINDOW_W = 3
-const WINDOW_H = 3
-const WINDOW_GAP = 2
+const WINDOW_W = 2.4
+const WINDOW_H = 2.4
+const WINDOW_GAP = 1.6
+const STEP = WINDOW_W + WINDOW_GAP
+
+// Deterministic PRNG (mulberry32) so each building's lit-window pattern is
+// stable across re-renders instead of reshuffling every time React repaints.
+function mulberry32(seed: number) {
+  let s = seed
+  return function () {
+    s |= 0
+    s = (s + 0x6d2b79f5) | 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// Every window cell that fits inside the building, top-to-bottom/left-to-right.
+function windowGrid(b: Building): Array<[number, number]> {
+  const cols = Math.max(1, Math.floor((b.width - 5) / STEP))
+  const rows = Math.max(1, Math.floor((b.height - 7) / STEP))
+  const cells: Array<[number, number]> = []
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) cells.push([row, col])
+  }
+  return cells
+}
+
+function windowPos(b: Building, row: number, col: number): [number, number] {
+  return [b.x + 2.5 + col * STEP, 50 - b.height + 4.5 + row * STEP]
+}
 
 function BuildingShape({ b, fill }: { b: Building; fill: string }) {
   return <rect x={b.x} y={50 - b.height} width={b.width} height={b.height} fill={fill} />
 }
 
-function Windows({ b, color }: { b: Building; color: string }) {
+// Day-mode buildings get the full window grid rendered as a faint grid of
+// panes (unlit glass, not glowing) so they read as buildings even in daylight
+// instead of flat color blocks.
+function DayWindows({ b, index }: { b: Building; index: number }) {
+  const fill = index % 2 === 0 ? '#3f4658' : '#333a4a'
   return (
     <>
-      {b.litWindows.map(([row, col], i) => {
-        const wx = b.x + 3 + col * (WINDOW_W + WINDOW_GAP)
-        const wy = 50 - b.height + 4 + row * (WINDOW_H + WINDOW_GAP)
-        if (wx + WINDOW_W > b.x + b.width - 2 || wy + WINDOW_H > 50 - 3) return null
-        return <rect key={i} x={wx} y={wy} width={WINDOW_W} height={WINDOW_H} fill={color} />
+      {windowGrid(b).map(([row, col], i) => {
+        const [wx, wy] = windowPos(b, row, col)
+        return <rect key={i} x={wx} y={wy} width={WINDOW_W} height={WINDOW_H} fill={fill} opacity="0.6" />
+      })}
+    </>
+  )
+}
+
+// Night-mode buildings light a majority of their windows (denser than day's
+// full-but-dim grid reads, since lit panes pop against the dark fill) with a
+// handful of cooler blue-white panes mixed into the warm glow for variety.
+function NightWindows({ b, index }: { b: Building; index: number }) {
+  const rand = mulberry32(index * 97 + 13)
+  const cells = windowGrid(b).filter(() => rand() < 0.65)
+  return (
+    <>
+      {cells.map(([row, col], i) => {
+        const [wx, wy] = windowPos(b, row, col)
+        const cool = (row + col + index) % 6 === 0
+        return (
+          <rect key={i} x={wx} y={wy} width={WINDOW_W} height={WINDOW_H} fill={cool ? '#bfe3f0' : '#f6c667'} />
+        )
       })}
     </>
   )
@@ -80,12 +125,15 @@ export function CityScene() {
           </g>
 
           {BUILDINGS.map((b, i) => (
-            <BuildingShape key={i} b={b} fill={i % 2 === 0 ? '#5b6270' : '#495062'} />
+            <g key={i}>
+              <BuildingShape b={b} fill={i % 2 === 0 ? '#5b6270' : '#495062'} />
+              <DayWindows b={b} index={i} />
+            </g>
           ))}
         </g>
 
         <g className="scene-visibility scene-night">
-          <g fill="#eaf2f3">
+          <g fill="#e9ddfb">
             {STAR_POSITIONS.map(([sx, sy, r], i) => (
               <circle
                 key={i}
@@ -98,13 +146,13 @@ export function CityScene() {
             ))}
           </g>
 
-          <circle className="scene-sun" cx="40" cy="15" r="6" fill="#eaf2f3" />
-          <circle cx="38" cy="13" r="6" fill="#170f2e" opacity="0.55" />
+          <circle className="scene-sun" cx="40" cy="15" r="6" fill="#e9ddfb" />
+          <circle cx="38" cy="13" r="6" fill="#1c1230" opacity="0.55" />
 
           {BUILDINGS.map((b, i) => (
             <g key={i}>
-              <BuildingShape b={b} fill={i % 2 === 0 ? '#141420' : '#1c1c2a'} />
-              <Windows b={b} color="#f6c667" />
+              <BuildingShape b={b} fill={i % 2 === 0 ? '#14101f' : '#1b1628' } />
+              <NightWindows b={b} index={i} />
             </g>
           ))}
         </g>
