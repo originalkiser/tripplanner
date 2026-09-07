@@ -16,6 +16,7 @@ export type ChangeType =
   | 'invited'
   | 'proposed_time'
   | 'photo_added'
+  | 'photo_liked'
   | 'comment'
 
 export interface Database {
@@ -249,7 +250,8 @@ export interface Database {
       activity_changes: {
         Row: {
           id: string
-          activity_id: string
+          trip_id: string
+          activity_id: string | null
           user_id: string
           change_type: ChangeType
           summary_text: string | null
@@ -257,7 +259,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          activity_id: string
+          trip_id: string
+          activity_id?: string | null
           user_id: string
           change_type: ChangeType
           summary_text?: string | null

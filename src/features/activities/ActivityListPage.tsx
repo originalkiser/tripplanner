@@ -119,11 +119,39 @@ export function ActivityListPage() {
           <DigestBanner onSelectActivity={setQuickViewId} />
         </div>
 
-        <section className="mt-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
-              Visited {loggedEntries.length > 0 && `(${loggedEntries.length})`}
-            </h2>
+        {view === 'list' ? (
+          <section className="mt-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-text-dim">
+                Visited {loggedEntries.length > 0 && `(${loggedEntries.length})`}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setLogging(true)}
+                className="shrink-0 rounded-full bg-coral px-3 py-1.5 text-xs font-medium text-white"
+              >
+                + Log a visit
+              </button>
+            </div>
+            {loggedEntries.length === 0 ? (
+              <p className="mt-2 text-xs text-text-dim">
+                Places you've been and things you've done — log them here as you go, no planning
+                required.
+              </p>
+            ) : (
+              <div className="mt-2 grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {loggedEntries.map((a) => (
+                  <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
+                ))}
+              </div>
+            )}
+          </section>
+        ) : (
+          // Calendar view already shows logged visits as blocks on the grid
+          // itself (they're mixed into `filtered` below) — the full-card
+          // "Visited" list would just duplicate them, so it only shows in
+          // list view. The "Log a visit" action still needs a home here.
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
               onClick={() => setLogging(true)}
@@ -132,19 +160,7 @@ export function ActivityListPage() {
               + Log a visit
             </button>
           </div>
-          {loggedEntries.length === 0 ? (
-            <p className="mt-2 text-xs text-text-dim">
-              Places you've been and things you've done — log them here as you go, no planning
-              required.
-            </p>
-          ) : (
-            <div className="mt-2 grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {loggedEntries.map((a) => (
-                <ActivityCard key={a.id} activity={a} highlightId={highlightId} />
-              ))}
-            </div>
-          )}
-        </section>
+        )}
 
         {loading && <p className="mt-4 text-sm text-text-dim">Loading…</p>}
 

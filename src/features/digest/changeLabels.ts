@@ -8,6 +8,7 @@ export const CHANGE_VERB: Record<ChangeType, string> = {
   invited: 'requested someone join',
   proposed_time: 'proposed a new time for',
   photo_added: 'added a photo to',
+  photo_liked: 'liked a photo',
   comment: 'commented on',
 }
 
@@ -19,5 +20,6 @@ export const CHANGE_GROUP_LABEL: Record<ChangeType, string> = {
   invited: 'New join requests',
   proposed_time: 'New proposed times',
   photo_added: 'New photos',
+  photo_liked: 'New photo likes',
   comment: 'New comments',
 }

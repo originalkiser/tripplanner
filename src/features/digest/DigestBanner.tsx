@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useDigestStore } from '../../stores/digestStore'
 import { CHANGE_GROUP_LABEL, CHANGE_VERB } from './changeLabels'
-import { groupChangeEntries, groupSummary } from './groupChanges'
+import { groupChangeEntries, groupSummary, groupTargetLabel } from './groupChanges'
 import type { ChangeType } from '../../types/database'
 
 export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: string) => void }) {
@@ -63,11 +63,17 @@ export function DigestBanner({ onSelectActivity }: { onSelectActivity: (id: stri
         <ul className="mt-2 flex flex-col gap-1.5 border-t border-white/20 pt-2 text-sm">
           {groups.map((g) => {
             const { verb, detail } = groupSummary(g)
+            const target = groupTargetLabel(g)
             const content = (
               <>
                 <span className="font-medium">{g.user?.display_name ?? 'Someone'}</span>{' '}
-                {verb || CHANGE_VERB[g.changeType]}{' '}
-                <span className="font-medium">{g.activity?.name ?? 'an activity'}</span>
+                {verb || CHANGE_VERB[g.changeType]}
+                {target && (
+                  <>
+                    {' '}
+                    <span className="font-medium">{target}</span>
+                  </>
+                )}
                 {detail && <span className="opacity-80"> ({detail})</span>}
               </>
             )
