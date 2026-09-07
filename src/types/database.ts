@@ -39,6 +39,7 @@ export interface Database {
           start_date: string
           end_date: string
           is_active: boolean
+          photo_archive_link: string | null
           created_at: string
         }
         Insert: {
@@ -47,6 +48,7 @@ export interface Database {
           start_date: string
           end_date: string
           is_active?: boolean
+          photo_archive_link?: string | null
           created_at?: string
         }
         Update: Partial<Database['trip']['Tables']['trips']['Insert']>
@@ -164,6 +166,7 @@ export interface Database {
           location_name: string | null
           location_lat: number | null
           location_lng: number | null
+          archived_at: string | null
         }
         Insert: {
           id?: string
@@ -176,6 +179,7 @@ export interface Database {
           location_name?: string | null
           location_lat?: number | null
           location_lng?: number | null
+          archived_at?: string | null
         }
         Update: Partial<Database['trip']['Tables']['activity_photos']['Insert']>
         Relationships: []
