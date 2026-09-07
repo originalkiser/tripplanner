@@ -143,9 +143,11 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
   fetchActivities: async () => {
     const generation = ++fetchGeneration
     set({ loading: true })
+    const tripId = await getActiveTripId()
     const { data, error } = await supabase
       .from('activities')
       .select(SELECT)
+      .eq('trip_id', tripId ?? '')
       .order('proposed_date', { ascending: true, nullsFirst: false })
       .order('proposed_time', { ascending: true, nullsFirst: false })
 

@@ -189,6 +189,7 @@ export interface Database {
       activity_photos: {
         Row: {
           id: string
+          trip_id: string
           activity_id: string | null
           user_id: string
           storage_path: string
@@ -202,6 +203,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          trip_id?: string
           activity_id?: string | null
           user_id: string
           storage_path: string
@@ -268,11 +270,13 @@ export interface Database {
       }
       digests_daily: {
         Row: {
+          trip_id: string
           date: string
           generated_summary: Record<string, unknown>
           created_at: string
         }
         Insert: {
+          trip_id?: string
           date: string
           generated_summary: Record<string, unknown>
           created_at?: string

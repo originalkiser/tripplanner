@@ -65,6 +65,13 @@ interface TripsState {
   setMemberRole: (tripId: string, userId: string, role: 'admin' | 'member') => Promise<{ error: string | null }>
   updateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
   addMembers: (tripId: string, userIds: string[]) => Promise<{ error: string | null }>
+  // Deactivates whatever trip is currently active and activates this one —
+  // the rest of the app (Home, Plans, Packing, Album, …) only ever shows
+  // the single is_active trip, so this is what actually makes a created
+  // trip "the" trip everyone sees, not just a row that exists. Requires
+  // being an admin of both trips (or the legacy global admin flag) since
+  // it touches both rows.
+  activateTrip: (tripId: string) => Promise<{ error: string | null }>
 }
 
 export const useTripsStore = create<TripsState>((set, get) => ({
@@ -176,6 +183,20 @@ export const useTripsStore = create<TripsState>((set, get) => ({
     )
     if (error) return { error: error.message }
     await get().fetchMembers(tripId)
+    return { error: null }
+  },
+
+  activateTrip: async (tripId) => {
+    const { data: current } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+    if (current && current.id !== tripId) {
+      const { error: deactivateError } = await supabase
+        .from('trips')
+        .update({ is_active: false })
+        .eq('id', current.id)
+      if (deactivateError) return { error: deactivateError.message }
+    }
+    const { error } = await supabase.from('trips').update({ is_active: true }).eq('id', tripId)
+    if (error) return { error: error.message }
     return { error: null }
   },
 }))

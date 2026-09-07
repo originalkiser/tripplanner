@@ -40,6 +40,24 @@ const SELECT = `
   votes:poll_votes(poll_id, user_id, option_id, not_interested, profile:user_profiles!user_id(display_name))
 `
 
+// Forces an inner join on activities so the trip_id filter below actually
+// restricts the top-level poll rows (a plain embedded/left-joined relation
+// wouldn't). Same shape as SELECT otherwise.
+const SELECT_WITH_TRIP = `
+  id, activity_id, created_by,
+  activity:activities!inner(id, name, trip_id),
+  options:poll_options(id, proposed_date, proposed_time, is_other, proposed_by),
+  votes:poll_votes(poll_id, user_id, option_id, not_interested, profile:user_profiles!user_id(display_name))
+`
+
+let cachedTripId: string | null = null
+async function getActiveTripId(): Promise<string | null> {
+  if (cachedTripId) return cachedTripId
+  const { data } = await supabase.from('trips').select('id').eq('is_active', true).limit(1).maybeSingle()
+  cachedTripId = data?.id ?? null
+  return cachedTripId
+}
+
 interface PollsState {
   byActivity: Record<string, Poll | undefined>
   all: Poll[]
@@ -75,7 +93,11 @@ export const usePollsStore = create<PollsState>((set, get) => ({
   },
 
   fetchAllForUser: async () => {
-    const { data, error } = await supabase.from('activity_polls').select(SELECT)
+    const tripId = await getActiveTripId()
+    const { data, error } = await supabase
+      .from('activity_polls')
+      .select(SELECT_WITH_TRIP)
+      .eq('activity.trip_id', tripId ?? '')
     if (error) {
       console.error(error)
       return
