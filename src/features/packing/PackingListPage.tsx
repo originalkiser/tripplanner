@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { usePackingStore } from '../../stores/packingStore'
 import { supabase } from '../../lib/supabase'
@@ -390,37 +391,39 @@ export function PackingListPage() {
         )}
       </div>
 
-      {confirmInvite && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setConfirmInvite(null)}
-        >
-          <div className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-2 font-heading text-lg font-semibold">Add to this list?</h3>
-            <p className="mb-4 text-sm text-text-dim">
-              {confirmInvite.map((m) => m.display_name).join(', ')} will be able to see and edit this
-              private list.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleConfirmInvite()}
-                className="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                Yes, add them
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmInvite(null)}
-                className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
-              >
-                Cancel
-              </button>
+      {confirmInvite &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setConfirmInvite(null)}
+          >
+            <div className="card-shadow w-full max-w-xs rounded-2xl bg-surface p-4" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-2 font-heading text-lg font-semibold">Add to this list?</h3>
+              <p className="mb-4 text-sm text-text-dim">
+                {confirmInvite.map((m) => m.display_name).join(', ')} will be able to see and edit this
+                private list.
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void handleConfirmInvite()}
+                  className="rounded-lg bg-coral px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Yes, add them
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmInvite(null)}
+                  className="rounded-lg bg-bg px-4 py-2 text-sm font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

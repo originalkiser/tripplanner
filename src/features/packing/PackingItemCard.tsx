@@ -126,7 +126,7 @@ export function PackingItemCard({
   return (
     <div
       className={`card-shadow rounded-xl border p-3 ${
-        allPacked ? 'border-green-300 bg-green-50' : 'border-line bg-surface'
+        allPacked ? 'border-success bg-success-tint' : 'border-line bg-surface'
       }`}
     >
       <div className="flex items-start justify-between gap-2">

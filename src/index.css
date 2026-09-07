@@ -19,6 +19,8 @@
   --color-savannah: #2d5d7b;
   --color-tybee: #1b7a8c;
   --color-coral: #d97a6c;
+  --color-success: #86efac;
+  --color-success-tint: #f0fdf4;
 }
 
 :root {
@@ -39,6 +41,8 @@
     --color-savannah: #7fb3d5;
     --color-tybee: #4fc3d9;
     --color-coral: #e2897c;
+    --color-success: #4ade80;
+    --color-success-tint: #14532d;
     --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.35);
   }
 }
@@ -56,6 +60,8 @@
   --color-savannah: #7fb3d5;
   --color-tybee: #4fc3d9;
   --color-coral: #e2897c;
+  --color-success: #4ade80;
+  --color-success-tint: #14532d;
   --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.35);
 }
 

@@ -63,8 +63,8 @@ export interface Database {
           trip_id: string
           user_id: string
           role: 'admin' | 'member'
-          arrival_date: string | null
-          departure_date: string | null
+          arrival_at: string | null
+          departure_at: string | null
           adults_count: number
           children_count: number
           allergies: string | null
@@ -74,8 +74,8 @@ export interface Database {
           trip_id: string
           user_id: string
           role?: 'admin' | 'member'
-          arrival_date?: string | null
-          departure_date?: string | null
+          arrival_at?: string | null
+          departure_at?: string | null
           adults_count?: number
           children_count?: number
           allergies?: string | null

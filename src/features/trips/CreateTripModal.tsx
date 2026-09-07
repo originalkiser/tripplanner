@@ -1,9 +1,28 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTripsStore, type StayInput } from '../../stores/tripsStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
 import { HeroScene, type HeroTheme } from '../../components/HeroScene'
 import type { Database } from '../../types/database'
+
+export interface EditableTrip {
+  id: string
+  name: string
+  location: string | null
+  start_date: string
+  end_date: string
+  hero_theme: HeroTheme
+}
+
+// datetime-local inputs need local wall-clock time, not the UTC string
+// toISOString() would give.
+function toDatetimeLocalValue(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 type Member = Database['trip']['Tables']['user_profiles']['Row']
 
@@ -26,21 +45,31 @@ interface PendingEmailInvite {
   name: string
 }
 
-export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+export function CreateTripModal({
+  trip,
+  onClose,
+  onCreated,
+}: {
+  trip?: EditableTrip
+  onClose: () => void
+  onCreated: () => void
+}) {
   const profile = useAuthStore((s) => s.profile)
   const createTrip = useTripsStore((s) => s.createTrip)
+  const updateTrip = useTripsStore((s) => s.updateTrip)
+  const isEdit = !!trip
 
-  const [name, setName] = useState('')
-  const [location, setLocation] = useState('')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [name, setName] = useState(trip?.name ?? '')
+  const [location, setLocation] = useState(trip?.location ?? '')
+  const [startDate, setStartDate] = useState(trip?.start_date ?? '')
+  const [endDate, setEndDate] = useState(trip?.end_date ?? '')
 
   const [stayName, setStayName] = useState('')
   const [stayType, setStayType] = useState<StayInput['stayType']>(null)
   const [stayAddress, setStayAddress] = useState('')
   const [checkInAt, setCheckInAt] = useState('')
   const [checkOutAt, setCheckOutAt] = useState('')
-  const [heroTheme, setHeroTheme] = useState<HeroTheme>('beach')
+  const [heroTheme, setHeroTheme] = useState<HeroTheme>(trip?.hero_theme ?? 'beach')
 
   const [knownUsers, setKnownUsers] = useState<Member[]>([])
   const [selectedKnownIds, setSelectedKnownIds] = useState<Set<string>>(new Set())
@@ -54,12 +83,31 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (isEdit) return
     void supabase
       .from('user_profiles')
       .select('*')
       .order('display_name')
       .then(({ data }) => setKnownUsers((data ?? []).filter((m) => m.id !== profile?.id)))
-  }, [profile?.id])
+  }, [profile?.id, isEdit])
+
+  useEffect(() => {
+    if (!trip) return
+    void supabase
+      .from('stays')
+      .select('*')
+      .eq('trip_id', trip.id)
+      .maybeSingle()
+      .then(({ data: stay }) => {
+        if (!stay) return
+        setStayName(stay.name ?? '')
+        setStayType(stay.stay_type)
+        setStayAddress(stay.address ?? '')
+        setCheckInAt(toDatetimeLocalValue(stay.check_in_at))
+        setCheckOutAt(toDatetimeLocalValue(stay.check_out_at))
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip?.id])
 
   function toggleKnown(userId: string) {
     setSelectedKnownIds((prev) => {
@@ -88,6 +136,33 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
     if (!profile || !name.trim() || !startDate || !endDate) return
     setSaving(true)
     setError(null)
+
+    if (isEdit && trip) {
+      setProgress('Saving…')
+      const stay: StayInput = {
+        name: stayName.trim() || null,
+        address: stayAddress.trim() || null,
+        stayType,
+        checkInAt: checkInAt ? new Date(checkInAt).toISOString() : null,
+        checkOutAt: checkOutAt ? new Date(checkOutAt).toISOString() : null,
+      }
+      const { error: updateError } = await updateTrip(trip.id, {
+        name: name.trim(),
+        location: location.trim() || null,
+        startDate,
+        endDate,
+        stay,
+        heroTheme,
+      })
+      setSaving(false)
+      setProgress(null)
+      if (updateError) {
+        setError(updateError)
+        return
+      }
+      onCreated()
+      return
+    }
 
     // New accounts for anyone not already known — same claim-your-password
     // flow as the existing Trip Members "Add someone" (no email actually
@@ -153,11 +228,14 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
     onCreated()
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40 p-4 backdrop-blur-sm sm:items-center sm:justify-center">
+      {/* Portaled to document.body — see CreateActivityModal for why a plain
+          z-50 here still gets clipped by the fixed hero scene and bottom
+          nav sitting outside <main> as siblings. */}
       <div className="flex max-h-[calc(100svh-2rem)] w-full max-w-md flex-col overflow-y-auto overflow-x-hidden overscroll-contain rounded-2xl bg-surface">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface p-4">
-          <h2 className="text-xl font-semibold text-primary">Create a Trip</h2>
+          <h2 className="text-xl font-semibold text-primary">{isEdit ? 'Edit Trip' : 'Create a Trip'}</h2>
           <button type="button" onClick={onClose} className="text-2xl leading-none opacity-60">
             &times;
           </button>
@@ -278,7 +356,7 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
             </div>
           </div>
 
-          {knownUsers.length > 0 && (
+          {!isEdit && knownUsers.length > 0 && (
             <div className="rounded-lg bg-bg p-3">
               <p className="mb-2 text-sm font-medium">Invite people you already trip with</p>
               <div className="flex flex-col gap-1.5">
@@ -296,55 +374,57 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
             </div>
           )}
 
-          <div className="rounded-lg bg-bg p-3">
-            <p className="mb-2 text-sm font-medium">Invite someone new by email</p>
-            <p className="mb-2 text-xs text-text-dim">
-              No email is actually sent — they'll get an account and set their own password the first time
-              they sign in with that email.
-            </p>
-            {emailInvites.length > 0 && (
-              <ul className="mb-2 flex flex-wrap gap-1.5">
-                {emailInvites.map((invite) => (
-                  <li
-                    key={invite.email}
-                    className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs"
-                  >
-                    {invite.name ? `${invite.name} (${invite.email})` : invite.email}
-                    <button
-                      type="button"
-                      onClick={() => removeEmailInvite(invite.email)}
-                      className="text-text-dim"
+          {!isEdit && (
+            <div className="rounded-lg bg-bg p-3">
+              <p className="mb-2 text-sm font-medium">Invite someone new by email</p>
+              <p className="mb-2 text-xs text-text-dim">
+                No email is actually sent — they'll get an account and set their own password the first time
+                they sign in with that email.
+              </p>
+              {emailInvites.length > 0 && (
+                <ul className="mb-2 flex flex-wrap gap-1.5">
+                  {emailInvites.map((invite) => (
+                    <li
+                      key={invite.email}
+                      className="flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-xs"
                     >
-                      &times;
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex flex-wrap gap-1.5">
-              <input
-                type="email"
-                placeholder="Email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
-              />
-              <input
-                placeholder="Name (optional)"
-                value={inviteName}
-                onChange={(e) => setInviteName(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
-              />
-              <button
-                type="button"
-                onClick={addEmailInvite}
-                disabled={!inviteEmail.trim()}
-                className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-              >
-                Add
-              </button>
+                      {invite.name ? `${invite.name} (${invite.email})` : invite.email}
+                      <button
+                        type="button"
+                        onClick={() => removeEmailInvite(invite.email)}
+                        className="text-text-dim"
+                      >
+                        &times;
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
+                />
+                <input
+                  placeholder="Name (optional)"
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={addEmailInvite}
+                  disabled={!inviteEmail.trim()}
+                  className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Add
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
         </form>
@@ -356,10 +436,11 @@ export function CreateTripModal({ onClose, onCreated }: { onClose: () => void; o
             disabled={saving}
             className="w-full rounded-xl bg-primary px-4 py-3 font-medium text-white disabled:opacity-50"
           >
-            {saving ? progress ?? 'Creating…' : 'Create trip'}
+            {saving ? progress ?? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save changes' : 'Create trip'}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
