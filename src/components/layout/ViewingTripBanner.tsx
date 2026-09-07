@@ -1,50 +1,40 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { getStoredCurrentTripId, setCurrentTripId } from '../../lib/currentTrip'
+import { getCurrentTripId } from '../../lib/currentTrip'
 
-// Shown only when this person has explicitly switched to browsing a trip
-// other than the one that's sitewide-active (see MyTripsPage's "View" button
-// and lib/currentTrip.ts) — otherwise invisible, since "viewing" and
-// "active" agree for everyone who hasn't switched.
+// There's no sitewide "active trip" any more — which trip you're looking at
+// is a personal choice (lib/currentTrip.ts), and with concurrent trips a
+// real possibility, always worth showing rather than only in the rare case
+// it disagrees with some shared default. Sits in the top-right corner of
+// the fixed hero band itself (not floating over page content) so it never
+// competes with a page's own sticky header or the centered
+// HappeningNow/Update banners.
 export function ViewingTripBanner() {
-  const [state, setState] = useState<{ viewingName: string; activeName: string } | null>(null)
+  const [tripName, setTripName] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
-      const chosen = getStoredCurrentTripId()
-      if (!chosen) {
-        setState(null)
+      const tripId = await getCurrentTripId()
+      if (!tripId) {
+        setTripName(null)
         return
       }
-      const [{ data: active }, { data: viewing }] = await Promise.all([
-        supabase.from('trips').select('id, name').eq('is_active', true).limit(1).maybeSingle(),
-        supabase.from('trips').select('name').eq('id', chosen).maybeSingle(),
-      ])
-      if (!active || !viewing || active.id === chosen) {
-        setState(null)
-        return
-      }
-      setState({ viewingName: viewing.name, activeName: active.name })
+      const { data } = await supabase.from('trips').select('name').eq('id', tripId).maybeSingle()
+      setTripName(data?.name ?? null)
     })()
   }, [])
 
-  if (!state) return null
+  if (!tripName) return null
 
   return (
-    <div
-      className="pointer-events-auto fixed inset-x-0 z-40 flex justify-center px-4"
-      style={{ top: 'calc(var(--scene-h) + 44px)' }}
+    <Link
+      to="/trips"
+      className="pointer-events-auto fixed right-3 z-[16] flex max-w-[45%] items-center gap-1 truncate rounded-full bg-black/30 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm"
+      style={{ top: 'calc(var(--scene-h) - 28px)' }}
     >
-      <div className="card-shadow flex max-w-full items-center gap-2 rounded-full bg-accent px-4 py-2 text-xs font-medium text-white">
-        <span className="truncate">Viewing "{state.viewingName}" — not your active trip</span>
-        <button
-          type="button"
-          onClick={() => setCurrentTripId(null)}
-          className="shrink-0 rounded-full bg-white/25 px-2 py-0.5"
-        >
-          Back to {state.activeName}
-        </button>
-      </div>
-    </div>
+      <span aria-hidden>📍</span>
+      <span className="truncate">{tripName}</span>
+    </Link>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTripsStore, type MyTripDetails } from '../../stores/tripsStore'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../lib/supabase'
-import { getStoredCurrentTripId, setCurrentTripId } from '../../lib/currentTrip'
+import { getStoredCurrentTripId, setCurrentTripId, pickCurrentTrip, pickUpcomingTrip, pickDefaultTrip } from '../../lib/currentTrip'
 import { resolveAssetUrl } from '../../lib/assetUrl'
 import { CreateTripModal } from './CreateTripModal'
 import type { Database } from '../../types/database'
@@ -18,13 +18,18 @@ function formatDateRange(start: string, end: string): string {
 
 export function MyTripsPage() {
   const profile = useAuthStore((s) => s.profile)
-  const { myTrips, members, fetchMyTrips, fetchMembers, setMemberRole, updateMyDetails, addMembers, activateTrip } =
-    useTripsStore()
-  const [activatingId, setActivatingId] = useState<string | null>(null)
+  const { myTrips, members, fetchMyTrips, fetchMembers, setMemberRole, updateMyDetails, addMembers } = useTripsStore()
   const [showCreate, setShowCreate] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [knownUsers, setKnownUsers] = useState<Member[]>([])
   const [viewingTripId] = useState(() => getStoredCurrentTripId())
+
+  const currentTrip = pickCurrentTrip(myTrips)
+  const upcomingTrip = pickUpcomingTrip(myTrips)
+  // What "viewing" resolves to right now: the explicit per-device choice if
+  // one's been made, otherwise whatever lib/currentTrip.ts would fall back
+  // to (same logic, run here just to render the right "Viewing" badge).
+  const resolvedViewingId = viewingTripId ?? pickDefaultTrip(myTrips)?.id ?? null
 
   useEffect(() => {
     if (profile) void fetchMyTrips(profile.id)
@@ -66,9 +71,34 @@ export function MyTripsPage() {
         </p>
       )}
 
+      {(currentTrip || upcomingTrip) && (
+        <div className="mt-4 flex gap-2">
+          {currentTrip && (
+            <button
+              type="button"
+              onClick={() => setCurrentTripId(currentTrip.id)}
+              disabled={resolvedViewingId === currentTrip.id}
+              className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+            >
+              View current trip
+            </button>
+          )}
+          {upcomingTrip && (
+            <button
+              type="button"
+              onClick={() => setCurrentTripId(upcomingTrip.id)}
+              disabled={resolvedViewingId === upcomingTrip.id}
+              className="flex-1 rounded-lg border border-primary px-3 py-2 text-xs font-medium text-primary disabled:opacity-50"
+            >
+              View upcoming trip
+            </button>
+          )}
+        </div>
+      )}
+
       <ul className="mt-4 flex flex-col gap-3">
         {myTrips.map((trip) => {
-          const isViewing = viewingTripId ? trip.id === viewingTripId : trip.is_active
+          const isViewing = trip.id === resolvedViewingId
           return (
             <li key={trip.id} className="card-shadow overflow-hidden rounded-xl border border-line bg-surface">
               <button
@@ -79,9 +109,9 @@ export function MyTripsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-heading font-semibold">{trip.name}</p>
-                    {trip.is_active && (
+                    {currentTrip?.id === trip.id && (
                       <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-medium text-accent">
-                        Active
+                        Happening now
                       </span>
                     )}
                     {isViewing && (
@@ -106,7 +136,6 @@ export function MyTripsPage() {
               {expandedId === trip.id && profile && (
                 <TripManagePanel
                   tripId={trip.id}
-                  isActive={trip.is_active}
                   isViewing={isViewing}
                   isAdmin={trip.myRole === 'admin'}
                   members={members[trip.id] ?? []}
@@ -115,21 +144,7 @@ export function MyTripsPage() {
                   onSetRole={setMemberRole}
                   onUpdateMyDetails={updateMyDetails}
                   onAddMembers={addMembers}
-                  onView={() => setCurrentTripId(trip.is_active ? null : trip.id)}
-                  activating={activatingId === trip.id}
-                  onActivate={async () => {
-                    if (
-                      !confirm(
-                        `Make "${trip.name}" the active trip? Everyone will see its Plans, Packing List, Album, etc. instead of the current trip's.`,
-                      )
-                    ) {
-                      return
-                    }
-                    setActivatingId(trip.id)
-                    await activateTrip(trip.id)
-                    setActivatingId(null)
-                    if (profile) void fetchMyTrips(profile.id)
-                  }}
+                  onView={() => setCurrentTripId(trip.id)}
                 />
               )}
             </li>
@@ -152,7 +167,6 @@ export function MyTripsPage() {
 
 function TripManagePanel({
   tripId,
-  isActive,
   isViewing,
   isAdmin,
   members,
@@ -162,11 +176,8 @@ function TripManagePanel({
   onUpdateMyDetails,
   onAddMembers,
   onView,
-  activating,
-  onActivate,
 }: {
   tripId: string
-  isActive: boolean
   isViewing: boolean
   isAdmin: boolean
   members: ReturnType<typeof useTripsStore.getState>['members'][string]
@@ -176,8 +187,6 @@ function TripManagePanel({
   onUpdateMyDetails: (tripId: string, userId: string, fields: MyTripDetails) => Promise<{ error: string | null }>
   onAddMembers: (tripId: string, userIds: string[]) => Promise<{ error: string | null }>
   onView: () => void
-  activating: boolean
-  onActivate: () => void
 }) {
   const mine = members.find((m) => m.user_id === myUserId)
   const [arrivalDate, setArrivalDate] = useState('')
@@ -241,18 +250,7 @@ function TripManagePanel({
           onClick={onView}
           className="mb-3 w-full rounded-lg border border-primary px-3 py-2 text-xs font-medium text-primary"
         >
-          {isActive ? 'View this trip' : "View this trip (without making it everyone's active trip)"}
-        </button>
-      )}
-
-      {isAdmin && !isActive && (
-        <button
-          type="button"
-          disabled={activating}
-          onClick={onActivate}
-          className="mb-3 w-full rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
-        >
-          {activating ? 'Activating…' : 'Make this the active trip'}
+          View this trip
         </button>
       )}
 
